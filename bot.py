@@ -10,7 +10,6 @@ import random
 import asyncio
 import hashlib
 import io
-import subprocess
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont
 
@@ -91,12 +90,6 @@ def load_settings():
 def save_settings(data):
     with open(SETTINGS_FILE, "w") as f:
         json.dump(data, f, indent=2)
-    try:
-        subprocess.run(["git", "add", "settings.json"], capture_output=True, timeout=5)
-        subprocess.run(["git", "commit", "-m", "auto: update settings", "--allow-empty"], capture_output=True, timeout=5)
-        subprocess.run(["git", "push", "origin", "main"], capture_output=True, timeout=10)
-    except Exception:
-        pass
 
 
 def load_tickets():
@@ -3911,7 +3904,6 @@ async def on_member_update(before: discord.Member, after: discord.Member):
 #  MUSIC SYSTEM
 # ──────────────────────────────────────────────
 
-import subprocess
 import shutil
 
 music_queues = {}
