@@ -4308,8 +4308,11 @@ DEFAULT_REGLEMENT = """1. Respecter tous les membres du serveur
 
 
 class ReglementModal(discord.ui.Modal, title="Configuration du Reglement"):
-    channel = discord.ui.TextInput(label="Canal (mention ou ID)", placeholder="#reglement ou 1234567890", required=True)
-    role = discord.ui.TextInput(label="Role a assigner (mention ou ID)", placeholder="@Membre ou 1234567890", required=True)
+    setup = discord.ui.TextInput(
+        label="Canal et Role ( sépare par un espace)",
+        placeholder="#reglement @Membre   ou   1234567890 1234567890",
+        required=True
+    )
     part1 = discord.ui.TextInput(
         label="Partie 1 — Regles generales",
         style=discord.TextStyle.paragraph,
@@ -4342,24 +4345,30 @@ class ReglementModal(discord.ui.Modal, title="Configuration du Reglement"):
     async def on_submit(self, interaction: discord.Interaction):
         gid = str(interaction.guild.id)
 
-        channel_input = self.channel.value.strip().replace("<#", "").replace(">", "")
+        parts_input = self.setup.value.strip().split()
+        if len(parts_input) < 2:
+            await interaction.response.send_message("Format invalide. Donne : `#canal @role` ou `ID_canal ID_role`.", ephemeral=True)
+            return
+
+        channel_input = parts_input[0].replace("<#", "").replace(">", "")
+        role_input = parts_input[1].replace("<@&", "").replace(">", "")
+
         try:
             channel_obj = interaction.guild.get_channel(int(channel_input))
             if not channel_obj:
-                await interaction.response.send_message("Canal introuvable. Utilise un salon du serveur.", ephemeral=True)
+                await interaction.response.send_message("Canal introuvable.", ephemeral=True)
                 return
         except ValueError:
-            await interaction.response.send_message("Canal invalide. Donne un ID ou mentionne un salon.", ephemeral=True)
+            await interaction.response.send_message("Canal invalide.", ephemeral=True)
             return
 
-        role_input = self.role.value.strip().replace("<@&", "").replace(">", "")
         try:
             role_obj = interaction.guild.get_role(int(role_input))
             if not role_obj:
-                await interaction.response.send_message("Role introuvable. Utilise un role du serveur.", ephemeral=True)
+                await interaction.response.send_message("Role introuvable.", ephemeral=True)
                 return
         except ValueError:
-            await interaction.response.send_message("Role invalide. Donne un ID ou mentionne un role.", ephemeral=True)
+            await interaction.response.send_message("Role invalide.", ephemeral=True)
             return
 
         parts = []
