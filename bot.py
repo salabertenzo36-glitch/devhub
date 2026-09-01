@@ -4295,16 +4295,21 @@ async def mod_panel(interaction: discord.Interaction):
 
 
 # --- REGLEMENT ---
-DEFAULT_REGLEMENT = """1. Respecter tous les membres du serveur
-2. Pas de harcelement, discrimination ou insultes
-3. Pas de spam (messages, images, mentions)
-4. Pas de contenu NSFW ou gore
-5. Pas de publicite non autorisee
-6. Utiliser les salons dans leur bon contexte
-7. Pas de partage de comptes ou d'infos personnelles
-8. Respecter les decisions du staff
-9. Pas de contournement des sanctions
-10. Le staff se reserve le droit de modifier ce reglement"""
+DEFAULT_REGLEMENT = """1. Respecter tous les membres du serveur sans exception
+2. Le harcèlement, les insultes, le racisme, le sexisme et toute forme de discrimination sont strictement interdits
+3. Le spam de messages, d'images, de mentions ou de emojis est interdit
+4. Tout contenu NSFW, gore, choquant ou illégal entraîne un ban immédiat
+5. La publicité non autorisée (autres serveurs, réseaux sociaux, produits) est interdite
+6. Utiliser les salons dans leur contexte : questions dans #questions, offres dans #offres, etc.
+7. Le partage de comptes Discord ou d'informations personnelles (adresse, numéro, etc.) est interdit
+8. Les faux signalements, le bait et le drama sont interdits
+9. Le contournement de sanctions (alt accounts, VPN, etc.) entraîne un ban permanent
+10. Le staff se réserve le droit de modifier ce règlement à tout moment
+11. Les décisions du staff sont finales et ne sont pas négociables
+12. Tout comportement perturbateur ou toxique sera sanctionné selon la gravité
+13. L'utilisation de bots malveillants ou de tools est strictement interdite
+14. Respecter les conditions d'utilisation de Discord (TOS)
+15. En cas de problème, contacter le staff via le ticket dédié"""
 
 
 class ReglementModal(discord.ui.Modal, title="Configuration du Reglement"):
