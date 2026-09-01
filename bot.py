@@ -4427,9 +4427,7 @@ async def reglement_post(interaction: discord.Interaction):
         await interaction.response.send_message("Le role configure est introuvable.", ephemeral=True)
         return
 
-    view = discord.ui.LayoutView(timeout=None)
-
-    def split_text(text, max_len=3000):
+    def split_text(text, max_len=3900):
         chunks = []
         current = ""
         for line in text.split("\n"):
@@ -4462,36 +4460,34 @@ async def reglement_post(interaction: discord.Interaction):
 
     for idx, (part_idx, total_parts, chunk, is_last_of_part) in enumerate(all_chunks):
         is_last_overall = idx == len(all_chunks) - 1
-        container = discord.ui.Container(accent_colour=11581636)
 
         if part_idx == 0 and idx == 0:
-            container.add_item(discord.ui.TextDisplay("## Reglement du serveur"))
-        elif is_last_of_part and total_parts > 1:
-            container.add_item(discord.ui.TextDisplay(f"## Reglement — Partie {part_idx+1}"))
-        elif not is_last_of_part:
-            container.add_item(discord.ui.TextDisplay(f"## Reglement — Partie {part_idx+1} (suite)"))
+            title = "Reglement du serveur"
+        elif total_parts > 1:
+            title = f"Reglement — Partie {part_idx+1}" + (" (suite)" if not is_last_of_part else "")
+        else:
+            title = "Reglement"
 
-        container.add_item(discord.ui.Separator())
-        container.add_item(discord.ui.TextDisplay(chunk))
-        container.add_item(discord.ui.Separator())
+        embed = discord.Embed(title=title, description=chunk, color=0xB0B8C4)
 
         if is_last_overall:
-            container.add_item(discord.ui.TextDisplay(
-                f"En cliquant sur **Accepter**, vous confirmez avoir lu et accepte l'ensemble du reglement.\n"
-                f"Le role {role.mention} vous sera automatiquement attribue."
-            ))
-            row = discord.ui.ActionRow()
-            row.add_item(discord.ui.Button(
-                label="Accepter",
-                style=discord.ButtonStyle.success,
-                custom_id="reglement_accept",
-                emoji=discord.PartialEmoji(name="764230verified", id=1544291510189563924, animated=True)
-            ))
-            container.add_item(row)
+            embed.set_footer(text=f"En cliquant sur Accepter, vous confirmez avoir lu et accepte l'ensemble du reglement. Le role {role.mention} vous sera attribue.")
 
-        view.add_item(container)
+        await interaction.channel.send(embed=embed)
 
-    await interaction.response.send_message(view=view)
+    view = discord.ui.LayoutView(timeout=None)
+    container = discord.ui.Container(accent_colour=11581636)
+    row = discord.ui.ActionRow()
+    row.add_item(discord.ui.Button(
+        label="Accepter",
+        style=discord.ButtonStyle.success,
+        custom_id="reglement_accept",
+        emoji=discord.PartialEmoji(name="764230verified", id=1544291510189563924, animated=True)
+    ))
+    container.add_item(row)
+    view.add_item(container)
+    await interaction.channel.send(view=view)
+    await interaction.response.send_message("Reglement publie !", ephemeral=True)
 
 
 # --- AI PANEL ---
