@@ -1340,7 +1340,7 @@ async def poll(interaction: discord.Interaction, question: str, option1: str, op
 HELP_CATEGORIES = {
     "mod": {
         "label": "Modération",
-        "emoji": "<:moderation:1543707525185142948>",
+        "emoji": "<:moderation:1544360335803285504>",
         "commands": [
             "`/mod warn` — Avertir un membre",
             "`/mod warnings` — Affiche les warns",
@@ -1362,7 +1362,7 @@ HELP_CATEGORIES = {
     },
     "config": {
         "label": "Configuration",
-        "emoji": "<:mod_avancee:1543707521401884843>",
+        "emoji": "<:mod_avancee:1544360332183474186>",
         "commands": [
             "`/config staff-roles` — Roles staff",
             "`/config ticket-channel` — Canal de tickets",
@@ -1375,7 +1375,7 @@ HELP_CATEGORIES = {
     },
     "welcome": {
         "label": "Welcome & Goodbye",
-        "emoji": "<:welcome:1543707541702185041>",
+        "emoji": "<:welcome:1544360380246138931>",
         "commands": [
             "`/welcome setup` — Configurer l'accueil",
             "`/welcome disable` — Désactiver l'accueil",
@@ -1390,7 +1390,7 @@ HELP_CATEGORIES = {
     },
     "ticket": {
         "label": "Tickets",
-        "emoji": "<:tickets:1543707535796600942>",
+        "emoji": "<:tickets:1544360362659414227>",
         "commands": [
             "`/ticket setup` — Setup complet",
             "`/ticket panel` — Envoyer le panel",
@@ -1421,7 +1421,7 @@ HELP_CATEGORIES = {
     },
     "util": {
         "label": "Utilitaires",
-        "emoji": "<:utilitaires:1543707537696628857>",
+        "emoji": "<:utilitaires:1544360366350270597>",
         "commands": [
             "`/util ping` — Latence",
             "`/util uptime` — Temps de fonctionnement",
@@ -1447,7 +1447,7 @@ HELP_CATEGORIES = {
     },
     "fun": {
         "label": "Fun",
-        "emoji": "<:fun:1543707513273196736>",
+        "emoji": "<:fun:1544360317973168202>",
         "commands": [
             "`/fun coinflip` — Pile ou face",
             "`/fun dice` — Lancer de dé",
@@ -1468,7 +1468,7 @@ HELP_CATEGORIES = {
     },
     "stats": {
         "label": "Statistiques",
-        "emoji": "<:stats:1543707530671427685>",
+        "emoji": "<:stats:1544360350806188123>",
         "commands": [
             "`/stats user` — Stats d'un membre",
             "`/stats server` — Stats du serveur",
@@ -1476,7 +1476,7 @@ HELP_CATEGORIES = {
     },
     "raid": {
         "label": "Anti-raid",
-        "emoji": "<:automod:1543707507631853683>",
+        "emoji": "<:automod:1544360302659895417>",
         "commands": [
             "`/raid config` — Configurer l'anti-raid intelligent",
             "`/raid log` — Salon de logs",
@@ -1491,7 +1491,7 @@ HELP_CATEGORIES = {
     },
     "ghostping": {
         "label": "Ghostping",
-        "emoji": "<:ghostping:1543707515995295876>",
+        "emoji": "<:ghostping:1544360324960886877>",
         "commands": [
             "`/ghostping send` — Ghostping un salon",
         ]
