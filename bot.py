@@ -4313,23 +4313,51 @@ async def mod_panel(interaction: discord.Interaction):
 
 
 # --- REGLEMENT ---
-@config.command(name="reglement", description="Configurer le systeme de reglement")
-@app_commands.describe(
-    channel="Canal du reglement",
-    role="Role a assigner apres acceptation",
-    text="Texte du reglement (separe par | pour les lignes)"
-)
+class ReglementModal(discord.ui.Modal, title="Configuration du Reglement"):
+    channel = discord.ui.TextInput(label="Canal (mention ou ID)", placeholder="#reglement ou 1234567890", required=True)
+    role = discord.ui.TextInput(label="Role a assigner (mention ou ID)", placeholder="@Membre ou 1234567890", required=True)
+    rules = discord.ui.TextInput(label="Reglement (une regle par ligne)", style=discord.TextStyle.paragraph, placeholder="1. Respecte les membres\n2. Pas de spam\n3. Pas de NSFW", required=True, max_length=4000)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        gid = str(interaction.guild.id)
+
+        channel_input = self.channel.value.strip().replace("<#", "").replace(">", "")
+        try:
+            channel_obj = interaction.guild.get_channel(int(channel_input))
+            if not channel_obj:
+                await interaction.response.send_message("Canal introuvable. Utilise un salon du serveur.", ephemeral=True)
+                return
+        except ValueError:
+            await interaction.response.send_message("Canal invalide. Donne un ID ou mentionne un salon.", ephemeral=True)
+            return
+
+        role_input = self.role.value.strip().replace("<@&", "").replace(">", "")
+        try:
+            role_obj = interaction.guild.get_role(int(role_input))
+            if not role_obj:
+                await interaction.response.send_message("Role introuvable. Utilise un role du serveur.", ephemeral=True)
+                return
+        except ValueError:
+            await interaction.response.send_message("Role invalide. Donne un ID ou mentionne un role.", ephemeral=True)
+            return
+
+        save_settings_field(gid, {
+            "reglement_channel": channel_obj.id,
+            "reglement_role": role_obj.id,
+            "reglement_text": self.rules.value,
+        })
+
+        await interaction.response.send_message(
+            f"Reglement configure !\n**Canal :** {channel_obj.mention}\n**Role :** {role_obj.mention}\n"
+            f"**Regles :** {len(self.rules.value.splitlines())} lignes\n\nUtilise `/config reglement-post` pour poster le panel.",
+            ephemeral=True
+        )
+
+
+@config.command(name="reglement", description="Configurer le systeme de reglement (ouvre un formulaire)")
 @app_commands.checks.has_permissions(administrator=True)
-async def reglement_config(interaction: discord.Interaction, channel: discord.TextChannel, role: discord.Role, text: str = ""):
-    gid = str(interaction.guild.id)
-    save_settings_field(gid, {
-        "reglement_channel": channel.id,
-        "reglement_role": role.id,
-        "reglement_text": text.replace("|", "\n") if text else "Aucun reglement defini.",
-    })
-    await interaction.response.send_message(
-        f"Reglement configure :\n**Canal :** {channel.mention}\n**Role :** {role.mention}\n**Texte :** {(text or 'Aucun')[:100]}..."
-    )
+async def reglement_config(interaction: discord.Interaction):
+    await interaction.response.send_modal(ReglementModal())
 
 
 @config.command(name="reglement-post", description="Poster le panel de reglement")
