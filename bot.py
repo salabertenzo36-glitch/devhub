@@ -3622,9 +3622,6 @@ async def check_nuke_action(guild, action_type, config):
         ])
 
 
-    await interaction.response.send_message(view=view)
-
-
 # ──────────────────────────────────────────────
 #  ON MESSAGE (AFK + AUTOMOD)
 # ──────────────────────────────────────────────
