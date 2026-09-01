@@ -1451,10 +1451,15 @@ HELP_CATEGORIES = {
         "label": "Anti-raid",
         "emoji": "<:automod:1543707507631853683>",
         "commands": [
-            "`/raid config` — Configurer l'anti-raid",
+            "`/raid config` — Configurer l'anti-raid intelligent",
             "`/raid log` — Salon de logs",
             "`/raid status` — Voir la config",
-            "`/raid whitelist` — Gérer la whitelist",
+            "`/raid whitelist` — Gerer la whitelist",
+            "`/raid blacklist` — Gerer la blacklist",
+            "`/raid lockdown` — Verrouiller/deverrouiller",
+            "`/raid massban` — Bannir les suspects",
+            "`/raid scan` — Scanner les membres",
+            "`/raid panel` — Panel interactif",
         ]
     },
     "ghostping": {
@@ -3136,9 +3141,30 @@ async def rate(interaction: discord.Interaction, chose: str):
 # ──────────────────────────────────────────────
 #  ANTI-RAID AVANCÉ
 # ──────────────────────────────────────────────
+#  ANTI-RAID INTELLIGENT (SCORE-BASED)
+# ──────────────────────────────────────────────
+
+import json, os
+
+RAID_STATE_FILE = os.path.join(os.path.dirname(__file__), "raid_state.json")
+
+def load_raid_state():
+    try:
+        with open(RAID_STATE_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_raid_state(state):
+    with open(RAID_STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
 
 join_tracker = defaultdict(list)
 name_history = defaultdict(list)
+raid_scores = defaultdict(lambda: defaultdict(int))
+flagged_members = defaultdict(list)
+lockdown_channels = defaultdict(set)
+raid_state = load_raid_state()
 
 def get_raid_config(gid):
     settings = load_settings()
@@ -3153,6 +3179,13 @@ def get_raid_config(gid):
         "check_avatar": s.get("raid_check_avatar", True),
         "check_name": s.get("raid_check_name", True),
         "whitelist": s.get("raid_whitelist", []),
+        "blacklist": s.get("raid_blacklist", []),
+        "score_kick": s.get("raid_score_kick", 10),
+        "score_ban": s.get("raid_score_ban", 20),
+        "anti_nuke": s.get("raid_anti_nuke", True),
+        "anti_webhook": s.get("raid_anti_webhook", True),
+        "verification_role": s.get("raid_verification_role"),
+        "lockdown_overwrite": s.get("raid_lockdown_overwrite", True),
     }
 
 def save_raid_config(gid, config):
@@ -3162,80 +3195,107 @@ def save_raid_config(gid, config):
     settings[gid].update(config)
     save_settings(settings)
 
+def levenshtein(s1, s2):
+    s1 = s1.lower()
+    s2 = s2.lower()
+    if len(s1) < len(s2):
+        return levenshtein(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    prev_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        curr_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = prev_row[j + 1] + 1
+            deletions = curr_row[j] + 1
+            substitutions = prev_row[j] + (c1 != c2)
+            curr_row.append(min(insertions, deletions, substitutions))
+        prev_row = curr_row
+    return prev_row[-1]
+
+def calculate_name_score(name, recent_names):
+    max_score = 0
+    clean = ''.join(c for c in name.lower() if c.isalnum())
+    for other in recent_names:
+        other_clean = ''.join(c for c in other.lower() if c.isalnum())
+        if not other_clean or not clean:
+            continue
+        dist = levenshtein(clean, other_clean)
+        max_len = max(len(clean), len(other_clean))
+        similarity = 1 - (dist / max_len) if max_len > 0 else 0
+        if similarity > 0.7:
+            score = int(similarity * 15)
+            max_score = max(max_score, score)
+    return max_score
+
+def is_default_avatar(member):
+    return member.avatar is None
+
 async def raid_log_send(guild, config, embed_lines):
-    if not config["log_channel"]:
+    if not config.get("log_channel"):
         return
     channel = guild.get_channel(int(config["log_channel"]))
     if not channel:
         return
-    view = view_text("## 🛡️ Anti-Raid", *embed_lines)
+    view = view_text("## Anti-Raid", *embed_lines)
     try:
         await channel.send(view=view)
     except discord.Forbidden:
         pass
 
-def is_default_avatar(member):
-    if member.avatar:
-        return False
-    return True
-
-def detect_name_pattern(member, recent_names):
-    name = member.display_name.lower()
-    clean = ''.join(c for c in name if c.isalnum())
-    for other in recent_names:
-        other_clean = ''.join(c for c in other if c.isalnum())
-        if clean != other_clean:
-            common = sum(1 for a, b in zip(clean, other_clean) if a == b)
-            max_len = max(len(clean), len(other_clean))
-            if max_len > 0 and common / max_len > 0.6:
-                return True
-    return False
-
-async def handle_raid_member(member, config, reason):
+async def handle_raid_action(member, config, reasons, score):
     guild = member.guild
-    action = config["action"]
+    if score >= config["score_ban"]:
+        action = "ban"
+    elif score >= config["score_kick"]:
+        action = config["action"]
+    else:
+        action = "timeout"
     try:
         if action == "ban":
-            await member.ban(reason=f"Anti-raid: {reason}", delete_message_days=1)
+            await member.ban(reason=f"Anti-raid (score {score}): {' | '.join(reasons)}", delete_message_days=1)
             await raid_log_send(guild, config, [
                 f"**BANNI** — {member.mention} (`{member.id}`)",
-                f"**Raison** {reason}",
-                f"**Compte créé** <t:{int(member.created_at.timestamp())}:R>",
-                f"**Action** Ban automatique"
+                f"**Score** `{score}/{config['score_ban']}`",
+                f"**Raisons** {' | '.join(reasons)}",
+                f"**Compte** <t:{int(member.created_at.timestamp())}:R>",
             ])
         elif action == "kick":
-            await member.kick(reason=f"Anti-raid: {reason}")
+            await member.kick(reason=f"Anti-raid (score {score}): {' | '.join(reasons)}")
             await raid_log_send(guild, config, [
-                f"**EXPUSE** — {member.mention} (`{member.id}`)",
-                f"**Raison** {reason}",
-                f"**Compte créé** <t:{int(member.created_at.timestamp())}:R>",
-                f"**Action** Kick automatique"
+                f"**EXPULSE** — {member.mention} (`{member.id}`)",
+                f"**Score** `{score}/{config['score_kick']}`",
+                f"**Raisons** {' | '.join(reasons)}",
+                f"**Compte** <t:{int(member.created_at.timestamp())}:R>",
             ])
         else:
             until = datetime.now(timezone.utc) + timedelta(minutes=30)
-            await member.timeout(until, reason=f"Anti-raid: {reason}")
+            await member.timeout(until, reason=f"Anti-raid (score {score}): {' | '.join(reasons)}")
             await raid_log_send(guild, config, [
-                f"**MUTÉ** — {member.mention} (`{member.id}`)",
-                f"**Raison** {reason}",
-                f"**Compte créé** <t:{int(member.created_at.timestamp())}:R>",
+                f"**MUTE** — {member.mention} (`{member.id}`)",
+                f"**Score** `{score}`",
+                f"**Raisons** {' | '.join(reasons)}",
+                f"**Compte** <t:{int(member.created_at.timestamp())}:R>",
                 f"**Action** Timeout 30min"
             ])
+        flagged_members[str(guild.id)].append(member.id)
     except discord.Forbidden:
         await raid_log_send(guild, config, [
-            f"**⚠️ ÉCHEC** — {member.mention} (`{member.id}`)",
-            f"**Raison** {reason}",
+            f"**ECHEC** — {member.mention} (`{member.id}`)",
+            f"**Raisons** {' | '.join(reasons)}",
             f"**Erreur** Permissions insuffisantes"
         ])
 
-@raid.command(name="config", description="Configure l'anti-raid avancé")
+@raid.command(name="config", description="Configure l'anti-raid intelligent")
 @app_commands.describe(
     state="on ou off",
-    max_joins="Max joins dans la fenêtre (défaut: 5)",
-    window="Fenêtre en secondes (défaut: 10)",
-    min_age="Âge min du compte en jours (défaut: 7)",
+    max_joins="Max joins dans la fenetre (defaut: 5)",
+    window="Fenetre en secondes (defaut: 10)",
+    min_age="Age min du compte en jours (defaut: 7)",
     action="Action: kick, ban ou timeout",
-    check_avatar="Vérifier les avatars par défaut (on/off)",
-    check_name="Vérifier les noms similaires (on/off)"
+    score_kick="Score pour kick (defaut: 10)",
+    score_ban="Score pour ban (defaut: 20)",
+    anti_nuke="Anti-nuke on/off",
 )
 @app_commands.choices(
     state=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
@@ -3244,11 +3304,10 @@ async def handle_raid_member(member, config, reason):
         app_commands.Choice(name="ban", value="ban"),
         app_commands.Choice(name="timeout", value="timeout"),
     ],
-    check_avatar=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
-    check_name=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
+    anti_nuke=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
 )
 @app_commands.checks.has_permissions(administrator=True)
-async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int = 5, window: int = 10, min_age: int = 7, action: str = "kick", check_avatar: str = "on", check_name: str = "on"):
+async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int = 5, window: int = 10, min_age: int = 7, action: str = "kick", score_kick: int = 10, score_ban: int = 20, anti_nuke: str = "on"):
     gid = str(interaction.guild.id)
     save_raid_config(gid, {
         "anti_raid": state == "on",
@@ -3256,18 +3315,19 @@ async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int
         "raid_window": window,
         "raid_min_age": min_age,
         "raid_action": action,
-        "raid_check_avatar": check_avatar == "on",
-        "raid_check_name": check_name == "on",
+        "raid_score_kick": score_kick,
+        "raid_score_ban": score_ban,
+        "raid_anti_nuke": anti_nuke == "on",
     })
-    status = "activé" if state == "on" else "désactivé"
+    status = "active" if state == "on" else "desactive"
     view = view_text(
-        "## 🛡️ Anti-Raid — Configuration",
-        f"**État** `{status}`",
+        "## Anti-Raid — Configuration",
+        f"**Etat** `{status}`",
         f"**Max joins** `{max_joins}` dans `{window}s`",
-        f"**Âge min compte** `{min_age}` jours",
+        f"**Age min compte** `{min_age}` jours",
         f"**Action** `{action}`",
-        f"**Check avatar** `{check_avatar}`",
-        f"**Check noms** `{check_name}`",
+        f"**Score kick** `{score_kick}` | **Score ban** `{score_ban}`",
+        f"**Anti-nuke** `{anti_nuke}`",
     )
     await interaction.response.send_message(view=view)
 
@@ -3278,11 +3338,11 @@ async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int
 async def raid_log(interaction: discord.Interaction, channel: discord.TextChannel):
     gid = str(interaction.guild.id)
     save_raid_config(gid, {"raid_log": channel.id})
-    await interaction.response.send_message(f"Logs anti-raid configurés dans {channel.mention}.")
+    await interaction.response.send_message(f"Logs anti-raid configures dans {channel.mention}.")
 
 
-@raid.command(name="whitelist", description="Ajoute ou retire un rôle de la whitelist anti-raid")
-@app_commands.describe(role="Le rôle à gérer")
+@raid.command(name="whitelist", description="Ajoute ou retire un role de la whitelist")
+@app_commands.describe(role="Le role a gerer")
 @app_commands.choices(action=[
     app_commands.Choice(name="ajouter", value="add"),
     app_commands.Choice(name="retirer", value="remove"),
@@ -3296,16 +3356,143 @@ async def raid_whitelist(interaction: discord.Interaction, role: discord.Role, a
         if role.id not in wl:
             wl.append(role.id)
             save_raid_config(gid, {"raid_whitelist": wl})
-            await interaction.response.send_message(f"{role.mention} ajouté à la whitelist.")
+            await interaction.response.send_message(f"{role.mention} ajoute a la whitelist.")
         else:
-            await interaction.response.send_message(f"{role.mention} déjà dans la whitelist.", ephemeral=True)
+            await interaction.response.send_message(f"{role.mention} deja dans la whitelist.", ephemeral=True)
     else:
         if role.id in wl:
             wl.remove(role.id)
             save_raid_config(gid, {"raid_whitelist": wl})
-            await interaction.response.send_message(f"{role.mention} retiré de la whitelist.")
+            await interaction.response.send_message(f"{role.mention} retire de la whitelist.")
         else:
             await interaction.response.send_message(f"{role.mention} n'est pas dans la whitelist.", ephemeral=True)
+
+
+@raid.command(name="blacklist", description="Ajoute ou retire un ID de la blacklist")
+@app_commands.describe(user_id="L'ID du membre a blacklister")
+@app_commands.choices(action=[
+    app_commands.Choice(name="ajouter", value="add"),
+    app_commands.Choice(name="retirer", value="remove"),
+])
+@app_commands.checks.has_permissions(administrator=True)
+async def raid_blacklist(interaction: discord.Interaction, user_id: str, action: str):
+    gid = str(interaction.guild.id)
+    config = get_raid_config(gid)
+    bl = config.get("blacklist", [])
+    uid = int(user_id)
+    if action == "add":
+        if uid not in bl:
+            bl.append(uid)
+            save_raid_config(gid, {"raid_blacklist": bl})
+            await interaction.response.send_message(f"`{user_id}` ajoute a la blacklist.")
+        else:
+            await interaction.response.send_message(f"`{user_id}` deja dans la blacklist.", ephemeral=True)
+    else:
+        if uid in bl:
+            bl.remove(uid)
+            save_raid_config(gid, {"raid_blacklist": bl})
+            await interaction.response.send_message(f"`{user_id}` retire de la blacklist.")
+        else:
+            await interaction.response.send_message(f"`{user_id}` n'est pas dans la blacklist.", ephemeral=True)
+
+
+@raid.command(name="lockdown", description="Verrouille ou deverrouille tous les salons")
+@app_commands.describe(state="lock ou unlock")
+@app_commands.choices(state=[
+    app_commands.Choice(name="lock", value="lock"),
+    app_commands.Choice(name="unlock", value="unlock"),
+])
+@app_commands.checks.has_permissions(administrator=True)
+async def raid_lockdown(interaction: discord.Interaction, state: str):
+    gid = str(interaction.guild.id)
+    guild = interaction.guild
+    everyone = guild.default_role
+    count = 0
+    if state == "lock":
+        for channel in guild.text_channels:
+            try:
+                overwrite = channel.overwrites_for(everyone)
+                overwrite.send_messages = False
+                await channel.set_permissions(everyone, overwrite=overwrite, reason="Lockdown")
+                lockdown_channels[gid].add(channel.id)
+                count += 1
+            except discord.Forbidden:
+                pass
+        save_raid_state(load_raid_state() | {gid: {"locked": True, "channels": list(lockdown_channels[gid])}})
+        await interaction.response.send_message(f"**{count}** salons verrouilles.")
+    else:
+        for channel in guild.text_channels:
+            try:
+                overwrite = channel.overwrites_for(everyone)
+                overwrite.send_messages = None
+                await channel.set_permissions(everyone, overwrite=overwrite, reason="Unlockdown")
+                lockdown_channels[gid].discard(channel.id)
+                count += 1
+            except discord.Forbidden:
+                pass
+        state_data = load_raid_state()
+        state_data.pop(gid, None)
+        save_raid_state(state_data)
+        await interaction.response.send_message(f"**{count}** salons deverrouilles.")
+
+
+@raid.command(name="massban", description="Bannir tous les membres suspects")
+@app_commands.describe(reason="Raison du massban")
+@app_commands.checks.has_permissions(ban_members=True)
+async def raid_massban(interaction: discord.Interaction, reason: str = "Anti-raid massban"):
+    await interaction.response.defer()
+    gid = str(interaction.guild.id)
+    flagged = flagged_members.get(gid, [])
+    if not flagged:
+        await interaction.followup.send("Aucun membre suspect a bannir.")
+        return
+    count = 0
+    for uid in flagged:
+        member = interaction.guild.get_member(uid)
+        if member:
+            try:
+                await member.ban(reason=reason, delete_message_days=1)
+                count += 1
+            except discord.Forbidden:
+                pass
+    flagged_members[gid] = []
+    await interaction.followup.send(f"**{count}** membres bannis.")
+
+
+@raid.command(name="scan", description="Scanner les membres actuels pour detects les suspects")
+@app_commands.checks.has_permissions(administrator=True)
+async def raid_scan(interaction: discord.Interaction):
+    await interaction.response.defer()
+    gid = str(interaction.guild.id)
+    config = get_raid_config(gid)
+    suspects = []
+    now = datetime.now(timezone.utc)
+    for member in interaction.guild.members:
+        if member.bot:
+            continue
+        if any(r.id in config.get("whitelist", []) for r in member.roles):
+            continue
+        score = 0
+        reasons = []
+        account_age = now - member.created_at
+        if account_age < timedelta(days=config["min_account_age"]):
+            s = min(15, (config["min_account_age"] - account_age.days) * 2)
+            score += s
+            reasons.append(f"Compte age {account_age.days}j")
+        if config["check_avatar"] and is_default_avatar(member):
+            score += 5
+            reasons.append("Avatar par defaut")
+        if score >= config["score_kick"]:
+            suspects.append((member, score, reasons))
+    if not suspects:
+        await interaction.followup.send("Aucun membre suspect detecte.")
+        return
+    lines = [f"**{len(suspects)} membres suspects:**\n"]
+    for member, score, reasons in suspects[:25]:
+        lines.append(f"- {member.mention} (`{member.id}`) — Score `{score}` — {', '.join(reasons)}")
+    if len(suspects) > 25:
+        lines.append(f"\n... et {len(suspects) - 25} autres.")
+    await interaction.followup.send("\n".join(lines))
 
 
 @raid.command(name="status", description="Affiche la configuration anti-raid")
@@ -3314,20 +3501,89 @@ async def raid_status(interaction: discord.Interaction):
     gid = str(interaction.guild.id)
     config = get_raid_config(gid)
     wl = config.get("whitelist", [])
+    bl = config.get("blacklist", [])
     wl_text = ", ".join(f"<@&{r}>" for r in wl) or "`Aucun`"
-    status = "activé" if config["enabled"] else "désactivé"
-    log_ch = f"<#{config['log_channel']}>" if config["log_channel"] else "`Non configuré`"
+    bl_text = ", ".join(f"`{r}`" for r in bl) or "`Aucun`"
+    status = "active" if config["enabled"] else "desactive"
+    log_ch = f"<#{config['log_channel']}>" if config["log_channel"] else "`Non configure`"
     view = view_text(
-        "## 🛡️ Anti-Raid — Status",
-        f"**État** `{status}`",
+        "## Anti-Raid — Status",
+        f"**Etat** `{status}`",
         f"**Max joins** `{config['max_joins']}` dans `{config['window']}s`",
-        f"**Âge min** `{config['min_account_age']}` jours",
+        f"**Age min** `{config['min_account_age']}` jours",
         f"**Action** `{config['action']}`",
-        f"**Check avatar** `{config['check_avatar']}`",
-        f"**Check noms** `{config['check_name']}`",
+        f"**Score kick** `{config['score_kick']}` | **Score ban** `{config['score_ban']}`",
+        f"**Anti-nuke** `{config['anti_nuke']}`",
         f"**Log** {log_ch}",
         f"**Whitelist** {wl_text}",
+        f"**Blacklist** {bl_text}",
     )
+    await interaction.response.send_message(view=view)
+
+
+@raid.command(name="panel", description="Panel interactif anti-raid")
+@app_commands.checks.has_permissions(administrator=True)
+async def raid_panel(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    config = get_raid_config(gid)
+    status = "ON" if config["enabled"] else "OFF"
+    view = discord.ui.LayoutView(timeout=120)
+    container = discord.ui.Container(accent_colour=11581636)
+    container.add_item(discord.ui.TextDisplay("## Panel Anti-Raid Intelligent"))
+    container.add_item(discord.ui.TextDisplay(
+        f"**Etat :** {status}\n"
+        f"**Max joins :** {config['max_joins']} dans {config['window']}s\n"
+        f"**Age min :** {config['min_account_age']} jours\n"
+        f"**Action :** {config['action']}\n"
+        f"**Score kick :** {config['score_kick']} | **Score ban :** {config['score_ban']}\n"
+        f"**Anti-nuke :** {config['anti_nuke']}\n"
+        f"**Detection par score cumulatif** — Chaque signal suspect ajoute des points"
+    ))
+    row = discord.ui.ActionRow()
+    row.add_item(discord.ui.Button(label="Activer", style=discord.ButtonStyle.success, custom_id="raid_on"))
+    row.add_item(discord.ui.Button(label="Desactiver", style=discord.ButtonStyle.danger, custom_id="raid_off"))
+    row.add_item(discord.ui.Button(label="Lockdown", style=discord.ButtonStyle.secondary, custom_id="raid_lockdown"))
+    container.add_item(row)
+    row2 = discord.ui.ActionRow()
+    row2.add_item(discord.ui.Button(label="Scan", style=discord.ButtonStyle.secondary, custom_id="raid_scan"))
+    row2.add_item(discord.ui.Button(label="Massban", style=discord.ButtonStyle.danger, custom_id="raid_massban"))
+    container.add_item(row2)
+    view.add_item(container)
+    await interaction.response.send_message(view=view, ephemeral=True)
+
+
+# ──────────────────────────────────────────────
+#  ANTI-NUKE DETECTION
+# ──────────────────────────────────────────────
+
+nuke_tracker = defaultdict(lambda: {"channels": [], "roles": [], "bans": [], "webhooks": []})
+
+async def check_nuke_action(guild, action_type, config):
+    if not config.get("anti_nuke", True):
+        return
+    gid = str(guild.id)
+    now = datetime.now(timezone.utc)
+    tracker = nuke_tracker[gid]
+    window = 300
+    tracker[action_type] = [t for t in tracker[action_type] if (now - t).total_seconds() < window]
+    tracker[action_type].append(now)
+    member_count = guild.member_count
+    thresholds = {
+        "channels": max(3, int(member_count * 0.05)),
+        "roles": max(3, int(member_count * 0.05)),
+        "bans": max(3, int(member_count * 0.03)),
+        "webhooks": 5,
+    }
+    count = len(tracker[action_type])
+    if count >= thresholds.get(action_type, 5):
+        await raid_log_send(guild, config, [
+            f"**NUKE DETECTE** — {action_type}",
+            f"**Actions** `{count}` dans les 5 dernieres minutes",
+            f"**Seuil** `{thresholds.get(action_type, 5)}`",
+            f"**Protection** Verrouillage automatique recommande",
+        ])
+
+
     await interaction.response.send_message(view=view)
 
 
@@ -3379,13 +3635,17 @@ async def on_message(message: discord.Message):
     guild_settings = settings.get(gid, {})
 
     if guild_settings.get("anti-link"):
-        if LINK_PATTERN.search(message.content):
+        content = message.content
+        if message.content:
+            content = re.sub(r'`[^`]*`', '', content)
+            content = re.sub(r'```[\s\S]*?```', '', content)
+        if LINK_PATTERN.search(content):
             perms = message.channel.permissions_for(message.author)
             if not perms.administrator:
                 try:
                     await message.delete()
                     await message.channel.send(
-                        f"**{message.author.display_name}**, les liens ne sont pas autorisés.",
+                        f"**{message.author.display_name}**, les liens ne sont pas autorises.",
                         delete_after=5
                     )
                 except discord.Forbidden:
@@ -3393,11 +3653,12 @@ async def on_message(message: discord.Message):
 
     if guild_settings.get("anti-spam"):
         now = time.time()
-        user_message_cache[message.author.id].append(now)
-        user_message_cache[message.author.id] = [
-            t for t in user_message_cache[message.author.id] if now - t < 5
+        cache_key = f"{message.author.id}_{message.channel.id}"
+        user_message_cache[cache_key].append(now)
+        user_message_cache[cache_key] = [
+            t for t in user_message_cache[cache_key] if now - t < 5
         ]
-        if len(user_message_cache[message.author.id]) >= 5:
+        if len(user_message_cache[cache_key]) >= 5:
             perms = message.channel.permissions_for(message.author)
             if not perms.administrator:
                 try:
@@ -3408,10 +3669,10 @@ async def on_message(message: discord.Message):
                     until = datetime.now(timezone.utc) + timedelta(minutes=5)
                     await message.author.timeout(until, reason="Anti-spam")
                     await message.channel.send(
-                        f"**{message.author.display_name}** muté 5 minutes pour spam.",
+                        f"**{message.author.display_name}** mute 5 minutes pour spam.",
                         delete_after=5
                     )
-                    await log_mod(message.guild, "Auto-Mute (anti-spam)", bot.user, message.author, "Spam détecté")
+                    await log_mod(message.guild, "Auto-Mute (anti-spam)", bot.user, message.author, "Spam detecte")
                 except (discord.Forbidden, discord.HTTPException):
                     pass
 
@@ -3454,6 +3715,34 @@ async def on_member_remove(member: discord.Member):
                     await channel.send(msg)
             except discord.Forbidden:
                 pass
+
+
+@bot.event
+async def on_guild_channel_delete(channel):
+    config = get_raid_config(str(channel.guild.id))
+    if config.get("anti_nuke", True):
+        await check_nuke_action(channel.guild, "channels", config)
+
+
+@bot.event
+async def on_guild_role_delete(role):
+    config = get_raid_config(str(role.guild.id))
+    if config.get("anti_nuke", True):
+        await check_nuke_action(role.guild, "roles", config)
+
+
+@bot.event
+async def on_member_ban(guild, user):
+    config = get_raid_config(str(guild.id))
+    if config.get("anti_nuke", True):
+        await check_nuke_action(guild, "bans", config)
+
+
+@bot.event
+async def on_webhooks_update(channel):
+    config = get_raid_config(str(channel.guild.id))
+    if config.get("anti_nuke", True):
+        await check_nuke_action(channel.guild, "webhooks", config)
 
 
 @bot.event
@@ -3506,35 +3795,57 @@ async def on_member_join(member: discord.Member):
     if any(r.id in wl for r in member.roles):
         return
 
+    bl = config.get("blacklist", [])
+    if member.id in bl:
+        try:
+            await member.ban(reason="Blacklist")
+            await raid_log_send(member.guild, config, [
+                f"**BLACKLIST** — {member.mention} (`{member.id}`)",
+                f"**Action** Ban automatique (ID blackliste)"
+            ])
+        except discord.Forbidden:
+            pass
+        return
+
+    score = 0
     reasons = []
     now = datetime.now(timezone.utc)
     account_age = now - member.created_at
 
     if account_age < timedelta(days=config["min_account_age"]):
-        reasons.append(f"Compte créé il y a `{account_age.days}` jour(s) (min: `{config['min_account_age']}`)")
+        s = min(15, (config["min_account_age"] - account_age.days) * 2)
+        score += s
+        reasons.append(f"Compte age {account_age.days}j (min: {config['min_account_age']}j)")
 
     if config["check_avatar"] and is_default_avatar(member):
-        reasons.append("Avatar par défaut détecté")
+        score += 5
+        reasons.append("Avatar par defaut")
 
     join_tracker[gid].append(now)
     join_tracker[gid] = [t for t in join_tracker[gid] if (now - t).total_seconds() < config["window"]]
 
+    if len(join_tracker[gid]) > config["max_joins"]:
+        flood_score = min(20, (len(join_tracker[gid]) - config["max_joins"]) * 3)
+        score += flood_score
+        reasons.append(f"Flood: {len(join_tracker[gid])} joins en {config['window']}s")
+
     if config["check_name"]:
         name_history[gid].append(member.display_name)
         name_history[gid] = name_history[gid][-50:]
-        if detect_name_pattern(member, name_history[gid][:-1]):
-            reasons.append("Nom similaire à un membre récent détecté")
+        name_score = calculate_name_score(member.display_name, name_history[gid][:-1])
+        if name_score > 0:
+            score += name_score
+            reasons.append(f"Nom similaire (score: {name_score})")
 
-    if len(join_tracker[gid]) > config["max_joins"]:
-        reasons.append(f"`{len(join_tracker[gid])}` joins en `{config['window']}s` (max: `{config['max_joins']}`)")
-
-        if reasons:
-            await handle_raid_member(member, config, " | ".join(reasons))
-        elif account_age < timedelta(days=config["min_account_age"] * 2):
+    if score > 0:
+        if score >= config["score_kick"]:
+            await handle_raid_action(member, config, reasons, score)
+        else:
             await raid_log_send(member.guild, config, [
-                f"**⚠️ Suspect** — {member.mention} (`{member.id}`)",
-                f"**Raison** Compte récent ({account_age.days}j)",
-                f"**Compte créé** <t:{int(member.created_at.timestamp())}:R>",
+                f"**SUSPECT** — {member.mention} (`{member.id}`)",
+                f"**Score** `{score}/{config['score_kick']}`",
+                f"**Raisons** {' | '.join(reasons)}",
+                f"**Compte** <t:{int(member.created_at.timestamp())}:R>",
             ])
 
 
@@ -3819,7 +4130,7 @@ AI_RANDOM = [
 async def get_ai_response(message_content, user_name):
     try:
         import g4f
-        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub. Tu connais tes 78+ commandes dans 12 groupes: /mod, /config, /welcome, /ticket, /music, /util, /fun, /backup, /stats, /raid, /ghostping, /ai. Si on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
+        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, help, effectif, hierarchie, staff, afk, remind\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: toggle, panel\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-spam, anti-link, verification gate, lockdown.\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
         response = g4f.ChatCompletion.create(
             model=g4f.models.gpt_4,
             messages=[
