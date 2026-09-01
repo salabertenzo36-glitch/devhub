@@ -4429,20 +4429,44 @@ async def reglement_post(interaction: discord.Interaction):
 
     view = discord.ui.LayoutView(timeout=None)
 
-    for i, part in enumerate(parts):
-        container = discord.ui.Container(accent_colour=11581636)
-        if i == 0:
-            container.add_item(discord.ui.TextDisplay("## Reglement du serveur"))
-        else:
-            container.add_item(discord.ui.TextDisplay(f"## Reglement — Partie {i+1}"))
-        container.add_item(discord.ui.Separator())
+    def split_text(text, max_len=3900):
+        chunks = []
+        current = ""
+        for line in text.split("\n"):
+            if len(current) + len(line) + 1 > max_len:
+                if current:
+                    chunks.append(current)
+                current = line
+            else:
+                current = current + "\n" + line if current else line
+        if current:
+            chunks.append(current)
+        return chunks
 
+    all_chunks = []
+    for i, part in enumerate(parts):
         lines = part.strip().split("\n")
         numbered = "\n".join(line.strip() for line in lines if line.strip())
-        container.add_item(discord.ui.TextDisplay(numbered))
+        chunks = split_text(numbered)
+        for j, chunk in enumerate(chunks):
+            all_chunks.append((i, len(parts), chunk, j == len(chunks) - 1))
+
+    for idx, (part_idx, total_parts, chunk, is_last_of_part) in enumerate(all_chunks):
+        is_last_overall = idx == len(all_chunks) - 1
+        container = discord.ui.Container(accent_colour=11581636)
+
+        if part_idx == 0 and idx == 0:
+            container.add_item(discord.ui.TextDisplay("## Reglement du serveur"))
+        elif is_last_of_part and total_parts > 1:
+            container.add_item(discord.ui.TextDisplay(f"## Reglement — Partie {part_idx+1}"))
+        elif not is_last_of_part:
+            container.add_item(discord.ui.TextDisplay(f"## Reglement — Partie {part_idx+1} (suite)"))
+
+        container.add_item(discord.ui.Separator())
+        container.add_item(discord.ui.TextDisplay(chunk))
         container.add_item(discord.ui.Separator())
 
-        if i == len(parts) - 1:
+        if is_last_overall:
             container.add_item(discord.ui.TextDisplay(
                 f"En cliquant sur **Accepter**, vous confirmez avoir lu et accepte l'ensemble du reglement.\n"
                 f"Le role {role.mention} vous sera automatiquement attribue."
