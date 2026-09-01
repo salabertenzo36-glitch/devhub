@@ -4295,10 +4295,49 @@ async def mod_panel(interaction: discord.Interaction):
 
 
 # --- REGLEMENT ---
+DEFAULT_REGLEMENT = """1. Respecter tous les membres du serveur
+2. Pas de harcelement, discrimination ou insultes
+3. Pas de spam (messages, images, mentions)
+4. Pas de contenu NSFW ou gore
+5. Pas de publicite non autorisee
+6. Utiliser les salons dans leur bon contexte
+7. Pas de partage de comptes ou d'infos personnelles
+8. Respecter les decisions du staff
+9. Pas de contournement des sanctions
+10. Le staff se reserve le droit de modifier ce reglement"""
+
+
 class ReglementModal(discord.ui.Modal, title="Configuration du Reglement"):
     channel = discord.ui.TextInput(label="Canal (mention ou ID)", placeholder="#reglement ou 1234567890", required=True)
     role = discord.ui.TextInput(label="Role a assigner (mention ou ID)", placeholder="@Membre ou 1234567890", required=True)
-    rules = discord.ui.TextInput(label="Reglement (une regle par ligne)", style=discord.TextStyle.paragraph, placeholder="1. Respecte les membres\n2. Pas de spam\n3. Pas de NSFW", required=True, max_length=4000)
+    part1 = discord.ui.TextInput(
+        label="Partie 1 — Regles generales",
+        style=discord.TextStyle.paragraph,
+        placeholder="1. Respecter tous les membres\n2. Pas de harcelement\n3. Pas de spam",
+        required=True,
+        max_length=4000
+    )
+    part2 = discord.ui.TextInput(
+        label="Partie 2 — Contenu & Channels",
+        style=discord.TextStyle.paragraph,
+        placeholder="4. Pas de NSFW\n5. Utiliser les bons salons\n6. Pas de pub non autorisee",
+        required=False,
+        max_length=4000
+    )
+    part3 = discord.ui.TextInput(
+        label="Partie 3 — Securite & Vie privee",
+        style=discord.TextStyle.paragraph,
+        placeholder="7. Pas de partage de comptes\n8. Pas d'infos personnelles",
+        required=False,
+        max_length=4000
+    )
+    part4 = discord.ui.TextInput(
+        label="Partie 4 — Sanctions & Staff",
+        style=discord.TextStyle.paragraph,
+        placeholder="9. Respecter le staff\n10. Pas de contournement de sanctions",
+        required=False,
+        max_length=4000
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
         gid = str(interaction.guild.id)
@@ -4323,15 +4362,20 @@ class ReglementModal(discord.ui.Modal, title="Configuration du Reglement"):
             await interaction.response.send_message("Role invalide. Donne un ID ou mentionne un role.", ephemeral=True)
             return
 
+        parts = []
+        for part in [self.part1.value, self.part2.value, self.part3.value, self.part4.value]:
+            if part and part.strip():
+                parts.append(part.strip())
+
         save_settings_field(gid, {
             "reglement_channel": channel_obj.id,
             "reglement_role": role_obj.id,
-            "reglement_text": self.rules.value,
+            "reglement_parts": parts,
         })
 
         await interaction.response.send_message(
             f"Reglement configure !\n**Canal :** {channel_obj.mention}\n**Role :** {role_obj.mention}\n"
-            f"**Regles :** {len(self.rules.value.splitlines())} lignes\n\nUtilise `/config reglement-post` pour poster le panel.",
+            f"**Parties :** {len(parts)}\n\nUtilise `/config reglement-post` pour poster le panel.",
             ephemeral=True
         )
 
@@ -4349,7 +4393,14 @@ async def reglement_post(interaction: discord.Interaction):
     settings = load_settings()
     s = settings.get(gid, {})
     role_id = s.get("reglement_role")
-    text = s.get("reglement_text", "Aucun reglement defini.")
+    parts = s.get("reglement_parts", [])
+
+    if not parts:
+        text = s.get("reglement_text", "")
+        if text:
+            parts = [text]
+        else:
+            parts = [DEFAULT_REGLEMENT]
 
     if not role_id:
         await interaction.response.send_message("Configure d'abord le reglement avec `/config reglement`.", ephemeral=True)
@@ -4360,28 +4411,37 @@ async def reglement_post(interaction: discord.Interaction):
         await interaction.response.send_message("Le role configure est introuvable.", ephemeral=True)
         return
 
-    lines = text.split("\n")
-    reglement_text = "\n".join(f"**{i+1}.** {line.strip()}" for i, line in enumerate(lines) if line.strip())
-
     view = discord.ui.LayoutView(timeout=None)
-    container = discord.ui.Container(accent_colour=11581636)
-    container.add_item(discord.ui.TextDisplay("## Reglement du serveur"))
-    container.add_item(discord.ui.Separator())
-    container.add_item(discord.ui.TextDisplay(reglement_text if reglement_text else "Aucun reglement defini."))
-    container.add_item(discord.ui.Separator())
-    container.add_item(discord.ui.TextDisplay(
-        f"En cliquant sur **Accepter**, vous confirmez avoir lu et accepte le reglement.\n"
-        f"Le role {role.mention} vous sera automatiquement attribue."
-    ))
-    row = discord.ui.ActionRow()
-    row.add_item(discord.ui.Button(
-        label="Accepter",
-        style=discord.ButtonStyle.success,
-        custom_id="reglement_accept",
-        emoji=discord.PartialEmoji(name="764230verified", id=1544291510189563924, animated=True)
-    ))
-    container.add_item(row)
-    view.add_item(container)
+
+    for i, part in enumerate(parts):
+        container = discord.ui.Container(accent_colour=11581636)
+        if i == 0:
+            container.add_item(discord.ui.TextDisplay("## Reglement du serveur"))
+        else:
+            container.add_item(discord.ui.TextDisplay(f"## Reglement — Partie {i+1}"))
+        container.add_item(discord.ui.Separator())
+
+        lines = part.strip().split("\n")
+        numbered = "\n".join(line.strip() for line in lines if line.strip())
+        container.add_item(discord.ui.TextDisplay(numbered))
+        container.add_item(discord.ui.Separator())
+
+        if i == len(parts) - 1:
+            container.add_item(discord.ui.TextDisplay(
+                f"En cliquant sur **Accepter**, vous confirmez avoir lu et accepte l'ensemble du reglement.\n"
+                f"Le role {role.mention} vous sera automatiquement attribue."
+            ))
+            row = discord.ui.ActionRow()
+            row.add_item(discord.ui.Button(
+                label="Accepter",
+                style=discord.ButtonStyle.success,
+                custom_id="reglement_accept",
+                emoji=discord.PartialEmoji(name="764230verified", id=1544291510189563924, animated=True)
+            ))
+            container.add_item(row)
+
+        view.add_item(container)
+
     await interaction.response.send_message(view=view)
 
 
