@@ -3819,7 +3819,7 @@ AI_RANDOM = [
 async def get_ai_response(message_content, user_name):
     try:
         import g4f
-        prompt = f"[CONTEXTE] Tu es Dev Hub, un bot Discord cree par ZerØ (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord. Tu connais toutes tes commandes (78+ dans 12 groupes: /mod, /config, /welcome, /ticket, /music, /util, /fun, /backup, /stats, /raid, /ghostping, /ai). [/CONTEXTE]\n\nUtilisateur: {user_name}\nMessage: {message_content}\nDev Hub:"
+        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub. Tu connais tes 78+ commandes dans 12 groupes: /mod, /config, /welcome, /ticket, /music, /util, /fun, /backup, /stats, /raid, /ghostping, /ai. Si on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
         response = g4f.ChatCompletion.create(
             model=g4f.models.gpt_4,
             messages=[
@@ -3827,7 +3827,10 @@ async def get_ai_response(message_content, user_name):
             ]
         )
         if response and len(response) > 0:
-            return response.strip()
+            clean = response.strip()
+            if clean.lower().startswith("dev hub:"):
+                clean = clean[8:].strip()
+            return clean
     except Exception as e:
         print(f"AI error: {e}")
     return "Je sais pas quoi dire la."
@@ -3980,7 +3983,7 @@ async def ai_panel(interaction: discord.Interaction):
     container.add_item(discord.ui.TextDisplay("## Panel IA"))
     container.add_item(discord.ui.TextDisplay(
         f"**Etat :** {ai}\n"
-        f"**Mode :** Reponse intelligente (GPT-4 via g4f)\n"
+        f"**Mode :** Reponse intelligente (GPT-4 via g4f, local)\n"
         f"**Usage :** Mentionne le bot + ton message\n"
         f"**Gratuit :** Pas de cle API requise"
     ))
