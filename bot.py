@@ -4429,11 +4429,20 @@ async def reglement_post(interaction: discord.Interaction):
 
     view = discord.ui.LayoutView(timeout=None)
 
-    def split_text(text, max_len=3900):
+    def split_text(text, max_len=3800):
         chunks = []
         current = ""
         for line in text.split("\n"):
-            if len(current) + len(line) + 1 > max_len:
+            if len(line) > max_len:
+                if current:
+                    chunks.append(current)
+                    current = ""
+                while len(line) > max_len:
+                    chunks.append(line[:max_len])
+                    line = line[max_len:]
+                if line:
+                    current = line
+            elif len(current) + len(line) + 1 > max_len:
                 if current:
                     chunks.append(current)
                 current = line
