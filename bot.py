@@ -4427,6 +4427,12 @@ async def reglement_post(interaction: discord.Interaction):
         await interaction.response.send_message("Le role configure est introuvable.", ephemeral=True)
         return
 
+    channel_id = s.get("reglement_channel")
+    reglement_channel = interaction.guild.get_channel(int(channel_id)) if channel_id else None
+    if not reglement_channel:
+        await interaction.response.send_message("Le salon de reglement est introuvable. Reconfigure avec `/config reglement`.", ephemeral=True)
+        return
+
     def split_text(text, max_len=3900):
         chunks = []
         current = ""
@@ -4490,9 +4496,9 @@ async def reglement_post(interaction: discord.Interaction):
             container.add_item(row)
 
         view.add_item(container)
-        await interaction.channel.send(view=view)
+        await reglement_channel.send(view=view)
 
-    await interaction.response.send_message("Reglement publie !", ephemeral=True)
+    await interaction.response.send_message(f"Reglement publie dans {reglement_channel.mention} !", ephemeral=True)
 
 
 # --- AI PANEL ---
