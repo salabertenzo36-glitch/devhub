@@ -3818,16 +3818,16 @@ AI_RANDOM = [
 
 async def get_ai_response(message_content, user_name):
     try:
-        from duckduckgo_search import DDGS
-        with DDGS() as ddgs:
-            results = list(ddgs.chat(
-                message_content,
-                model="gpt-4o-mini"
-            ))
-            if results:
-                response = results[-1].get("answer", "")
-                if response:
-                    return response
+        import g4f
+        response = g4f.ChatCompletion.create(
+            model=g4f.models.gpt_4,
+            messages=[
+                {"role": "system", "content": f"Tu es un bot Discord sarcastique et insolent qui s'appelle Dev Hub. Tu réponds en français, de manière concise et drôle. Tu ne mets jamais d'emojis. Tu es un peu agent mais drôle."},
+                {"role": "user", "content": message_content}
+            ]
+        )
+        if response and len(response) > 0:
+            return response
     except Exception as e:
         print(f"AI error: {e}")
     return "Je sais pas quoi dire là."
@@ -3980,7 +3980,7 @@ async def ai_panel(interaction: discord.Interaction):
     container.add_item(discord.ui.TextDisplay("## Panel IA"))
     container.add_item(discord.ui.TextDisplay(
         f"**Etat :** {ai}\n"
-        f"**Mode :** Reponse intelligente (GPT via DuckDuckGo)\n"
+        f"**Mode :** Reponse intelligente (GPT-4 via g4f)\n"
         f"**Usage :** Mentionne le bot + ton message\n"
         f"**Gratuit :** Pas de cle API requise"
     ))
