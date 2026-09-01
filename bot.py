@@ -3672,7 +3672,7 @@ async def play_next(guild_id):
 
         if player.channel:
             view = discord.ui.LayoutView()
-            container = discord.ui.Container(accent_colour=17619185)
+            container = discord.ui.Container(accent_colour=11581636)
             section = discord.ui.Section(
                 accessory=discord.ui.Thumbnail(media=f"https://img.youtube.com/vi/{track['id']}/maxresdefault.jpg", description=track["title"])
             )
@@ -3871,7 +3871,7 @@ class WelcomePanel(discord.ui.LayoutView):
         msg = s.get("welcome_message", "Bienvenue {user} sur **{server}** !")
         img = "Activée" if s.get("welcome_image", True) else "Désactivée"
 
-        container = discord.ui.Container(accent_colour=17619185)
+        container = discord.ui.Container(accent_colour=11581636)
         container.add_item(discord.ui.TextDisplay("## ⚙️ Panel Welcome"))
         container.add_item(discord.ui.TextDisplay(f"**Salon :** {ch_text}\n**Image :** {img}\n**Message :** `{msg}`"))
         row = discord.ui.ActionRow()
@@ -3906,7 +3906,7 @@ async def goodbye_panel(interaction: discord.Interaction):
     img = "Activée" if s.get("goodbye_image", True) else "Désactivée"
 
     view = discord.ui.LayoutView(timeout=120)
-    container = discord.ui.Container(accent_colour=17619185)
+    container = discord.ui.Container(accent_colour=11581636)
     container.add_item(discord.ui.TextDisplay("## ⚙️ Panel Goodbye"))
     container.add_item(discord.ui.TextDisplay(f"**Salon :** {ch_text}\n**Image :** {img}\n**Message :** `{msg}`"))
     row = discord.ui.ActionRow()
@@ -3932,7 +3932,7 @@ async def boost_panel(interaction: discord.Interaction):
     img = "Activée" if s.get("boost_image", True) else "Désactivée"
 
     view = discord.ui.LayoutView(timeout=120)
-    container = discord.ui.Container(accent_colour=17619185)
+    container = discord.ui.Container(accent_colour=11581636)
     container.add_item(discord.ui.TextDisplay("## ⚙️ Panel Boost"))
     container.add_item(discord.ui.TextDisplay(f"**Salon :** {ch_text}\n**Image :** {img}\n**Message :** `{msg}`"))
     row = discord.ui.ActionRow()
@@ -3957,7 +3957,7 @@ async def mod_panel(interaction: discord.Interaction):
     log_text = log_ch.mention if log_ch else "Non configuré"
 
     view = discord.ui.LayoutView(timeout=120)
-    container = discord.ui.Container(accent_colour=17619185)
+    container = discord.ui.Container(accent_colour=11581636)
     container.add_item(discord.ui.TextDisplay("## 🛡️ Panel Modération"))
     container.add_item(discord.ui.TextDisplay(f"**Automod :** {automod}\n**Logs :** {log_text}"))
     row = discord.ui.ActionRow()
@@ -3981,7 +3981,7 @@ async def ai_panel(interaction: discord.Interaction):
     ai = "ON" if s.get("ai_enabled") else "OFF"
 
     view = discord.ui.LayoutView(timeout=120)
-    container = discord.ui.Container(accent_colour=17619185)
+    container = discord.ui.Container(accent_colour=11581636)
     container.add_item(discord.ui.TextDisplay("## 🤖 Panel IA Insolente"))
     container.add_item(discord.ui.TextDisplay(f"**État :** {ai}"))
     row = discord.ui.ActionRow()
