@@ -28,6 +28,21 @@ class EOFBot(commands.Bot):
         self.add_view(PersistentTicketView())
 
 
+# ─── GROUPES DE COMMANDES ───
+mod = app_commands.Group(name="mod", description="Modération")
+config = app_commands.Group(name="config", description="Configuration du bot")
+welcome = app_commands.Group(name="welcome", description="Welcome, Goodbye & Boost")
+ticket = app_commands.Group(name="ticket", description="Système de tickets")
+music = app_commands.Group(name="music", description="Commandes musique")
+util = app_commands.Group(name="util", description="Utilitaires")
+fun = app_commands.Group(name="fun", description="Fun & Jeux")
+backup = app_commands.Group(name="backup", description="Sauvegardes")
+stats = app_commands.Group(name="stats", description="Statistiques")
+raid = app_commands.Group(name="raid", description="Anti-raid")
+ghostping = app_commands.Group(name="ghostping", description="Ghostping & Autorole")
+ai = app_commands.Group(name="ai", description="Intelligence artificielle")
+
+
 class PersistentTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -396,9 +411,10 @@ async def on_guild_join(guild: discord.Guild):
 
 @bot.event
 async def on_interaction(interaction: discord.Interaction):
-    if interaction.type != discord.InteractionType.component:
+    if interaction.type not in (discord.InteractionType.component, discord.InteractionType.modal_submit):
         return
     custom_id = interaction.data.get("custom_id", "")
+    cid = custom_id
 
     if custom_id == "help_category_select":
         value = interaction.data.get("values", [None])[0]
@@ -512,16 +528,176 @@ async def on_interaction(interaction: discord.Interaction):
         except discord.Forbidden:
             await interaction.followup.send("Pas les permissions pour supprimer ce salon.")
 
+    # --- PANELS (components) ---
+    elif cid in ("wp_channel", "wp_message", "wp_image", "wp_disable",
+                 "gp_channel", "gp_message", "gp_image", "gp_disable",
+                 "bp_channel", "bp_message", "bp_image", "bp_disable",
+                 "mp_automod", "mp_log", "mp_purge",
+                 "ai_on", "ai_off"):
+        gid = str(interaction.guild.id) if interaction.guild else None
+        settings = load_settings()
+        if gid and gid not in settings:
+            settings[gid] = {}
+
+        if cid == "wp_channel":
+            modal = discord.ui.Modal(title="Salon Welcome", custom_id="wp_channel_modal")
+            modal.add_item(discord.ui.TextInput(label="ID ou mention du salon", placeholder="#general"))
+            await interaction.response.send_modal(modal)
+        elif cid == "wp_message":
+            modal = discord.ui.Modal(title="Message Welcome", custom_id="wp_message_modal")
+            modal.add_item(discord.ui.TextInput(label="Message", placeholder="Bienvenue {user} sur {server} !", style=discord.TextStyle.paragraph))
+            await interaction.response.send_modal(modal)
+        elif cid == "wp_image":
+            current = settings[gid].get("welcome_image", True)
+            settings[gid]["welcome_image"] = not current
+            save_settings(settings)
+            await interaction.response.send_message(f"Image Canvas : {'Activée' if not current else 'Désactivée'}", ephemeral=True)
+        elif cid == "wp_disable":
+            settings[gid].pop("welcome_channel", None)
+            settings[gid].pop("welcome_message", None)
+            settings[gid].pop("welcome_image", None)
+            save_settings(settings)
+            await interaction.response.send_message("Welcome désactivé.", ephemeral=True)
+        elif cid == "gp_channel":
+            modal = discord.ui.Modal(title="Salon Goodbye", custom_id="gp_channel_modal")
+            modal.add_item(discord.ui.TextInput(label="ID ou mention du salon", placeholder="#goodbye"))
+            await interaction.response.send_modal(modal)
+        elif cid == "gp_message":
+            modal = discord.ui.Modal(title="Message Goodbye", custom_id="gp_message_modal")
+            modal.add_item(discord.ui.TextInput(label="Message", placeholder="{user} a quitté {server}.", style=discord.TextStyle.paragraph))
+            await interaction.response.send_modal(modal)
+        elif cid == "gp_image":
+            current = settings[gid].get("goodbye_image", True)
+            settings[gid]["goodbye_image"] = not current
+            save_settings(settings)
+            await interaction.response.send_message(f"Image Canvas : {'Activée' if not current else 'Désactivée'}", ephemeral=True)
+        elif cid == "gp_disable":
+            settings[gid].pop("goodbye_channel", None)
+            settings[gid].pop("goodbye_message", None)
+            settings[gid].pop("goodbye_image", None)
+            save_settings(settings)
+            await interaction.response.send_message("Goodbye désactivé.", ephemeral=True)
+        elif cid == "bp_channel":
+            modal = discord.ui.Modal(title="Salon Boost", custom_id="bp_channel_modal")
+            modal.add_item(discord.ui.TextInput(label="ID ou mention du salon", placeholder="#boost"))
+            await interaction.response.send_modal(modal)
+        elif cid == "bp_message":
+            modal = discord.ui.Modal(title="Message Boost", custom_id="bp_message_modal")
+            modal.add_item(discord.ui.TextInput(label="Message", placeholder="{user} a boosté {server} !", style=discord.TextStyle.paragraph))
+            await interaction.response.send_modal(modal)
+        elif cid == "bp_image":
+            current = settings[gid].get("boost_image", True)
+            settings[gid]["boost_image"] = not current
+            save_settings(settings)
+            await interaction.response.send_message(f"Image Canvas : {'Activée' if not current else 'Désactivée'}", ephemeral=True)
+        elif cid == "bp_disable":
+            settings[gid].pop("boost_channel", None)
+            settings[gid].pop("boost_message", None)
+            settings[gid].pop("boost_image", None)
+            save_settings(settings)
+            await interaction.response.send_message("Boost désactivé.", ephemeral=True)
+        elif cid == "mp_automod":
+            current = settings[gid].get("automod_enabled", False)
+            settings[gid]["automod_enabled"] = not current
+            save_settings(settings)
+            await interaction.response.send_message(f"Automod : {'ON' if not current else 'OFF'}", ephemeral=True)
+        elif cid == "mp_log":
+            modal = discord.ui.Modal(title="Salon Logs Mod", custom_id="mp_log_modal")
+            modal.add_item(discord.ui.TextInput(label="ID ou mention du salon", placeholder="#mod-logs"))
+            await interaction.response.send_modal(modal)
+        elif cid == "mp_purge":
+            deleted = await interaction.channel.purge(limit=100)
+            await interaction.response.send_message(f"`{len(deleted)}` messages supprimés.", ephemeral=True)
+        elif cid == "ai_on":
+            settings[gid]["ai_enabled"] = True
+            save_settings(settings)
+            await interaction.response.send_message("🤖 IA activée.", ephemeral=True)
+        elif cid == "ai_off":
+            settings[gid]["ai_enabled"] = False
+            save_settings(settings)
+            await interaction.response.send_message("😴 IA désactivée.", ephemeral=True)
+
+    # --- MODALS (panels) ---
+    elif interaction.type == discord.InteractionType.modal_submit:
+        gid = str(interaction.guild.id) if interaction.guild else None
+        if not gid:
+            return
+        settings = load_settings()
+        if gid not in settings:
+            settings[gid] = {}
+        value = interaction.data["components"][0]["components"][0]["value"]
+
+        if cid == "wp_channel_modal":
+            ch_id = value.strip("<#>")
+            try:
+                ch = interaction.guild.get_channel(int(ch_id))
+                if ch:
+                    settings[gid]["welcome_channel"] = ch.id
+                    save_settings(settings)
+                    await interaction.response.send_message(f"Salon welcome : {ch.mention}", ephemeral=True)
+                    return
+            except ValueError:
+                pass
+            await interaction.response.send_message("Salon introuvable.", ephemeral=True)
+        elif cid == "wp_message_modal":
+            settings[gid]["welcome_message"] = value
+            save_settings(settings)
+            await interaction.response.send_message(f"Message : `{value}`", ephemeral=True)
+        elif cid == "gp_channel_modal":
+            ch_id = value.strip("<#>")
+            try:
+                ch = interaction.guild.get_channel(int(ch_id))
+                if ch:
+                    settings[gid]["goodbye_channel"] = ch.id
+                    save_settings(settings)
+                    await interaction.response.send_message(f"Salon goodbye : {ch.mention}", ephemeral=True)
+                    return
+            except ValueError:
+                pass
+            await interaction.response.send_message("Salon introuvable.", ephemeral=True)
+        elif cid == "gp_message_modal":
+            settings[gid]["goodbye_message"] = value
+            save_settings(settings)
+            await interaction.response.send_message(f"Message : `{value}`", ephemeral=True)
+        elif cid == "bp_channel_modal":
+            ch_id = value.strip("<#>")
+            try:
+                ch = interaction.guild.get_channel(int(ch_id))
+                if ch:
+                    settings[gid]["boost_channel"] = ch.id
+                    save_settings(settings)
+                    await interaction.response.send_message(f"Salon boost : {ch.mention}", ephemeral=True)
+                    return
+            except ValueError:
+                pass
+            await interaction.response.send_message("Salon introuvable.", ephemeral=True)
+        elif cid == "bp_message_modal":
+            settings[gid]["boost_message"] = value
+            save_settings(settings)
+            await interaction.response.send_message(f"Message : `{value}`", ephemeral=True)
+        elif cid == "mp_log_modal":
+            ch_id = value.strip("<#>")
+            try:
+                ch = interaction.guild.get_channel(int(ch_id))
+                if ch:
+                    settings[gid]["mod_log_channel"] = ch.id
+                    save_settings(settings)
+                    await interaction.response.send_message(f"Salon logs : {ch.mention}", ephemeral=True)
+                    return
+            except ValueError:
+                pass
+            await interaction.response.send_message("Salon introuvable.", ephemeral=True)
+
 
 # ──────────────────────────────────────────────
 #  GHOSTPING & AUTOROLE
 # ──────────────────────────────────────────────
 
 
-@bot.tree.command(name="ghostping", description="Ghostping tous les membres d'un salon un par un")
+@ghostping.command(name="send", description="Ghostping tous les membres d'un salon un par un")
 @app_commands.describe(channel="Le salon cible")
 @app_commands.checks.has_permissions(administrator=True)
-async def ghostping(interaction: discord.Interaction, channel: discord.TextChannel):
+async def ghostping_send(interaction: discord.Interaction, channel: discord.TextChannel):
     await interaction.response.send_message(f"Ghostping dans {channel.mention}...", ephemeral=True)
 
     count = 0
@@ -538,85 +714,78 @@ async def ghostping(interaction: discord.Interaction, channel: discord.TextChann
     await interaction.followup.send(f"`{count}` ghostpings envoyés dans {channel.mention}.", ephemeral=True)
 
 
-@bot.tree.command(name="welcome-ghostping", description="Configure les salons de ghostping à l'arrivée d'un membre")
-@app_commands.describe(channels="Les salons (séparés par un espace)")
+@welcome.command(name="ghostping", description="Gère les salons de welcome ghostping (add/list/remove/clear)")
+@app_commands.describe(
+    action="Action à effectuer",
+    channels="Les salons (add/remove uniquement)"
+)
+@app_commands.choices(action=[
+    app_commands.Choice(name="add", value="add"),
+    app_commands.Choice(name="list", value="list"),
+    app_commands.Choice(name="remove", value="remove"),
+    app_commands.Choice(name="clear", value="clear"),
+])
 @app_commands.checks.has_permissions(administrator=True)
-async def welcome_ghostping(interaction: discord.Interaction, channels: str):
+async def welcome_ghostping(interaction: discord.Interaction, action: str, channels: str = None):
     settings = load_settings()
     gid = str(interaction.guild.id)
 
     if gid not in settings:
         settings[gid] = {}
 
-    ids = []
-    for c in channels.split():
-        c = c.strip("<#>")
-        try:
-            ch = interaction.guild.get_channel(int(c))
-            if ch:
-                ids.append(str(ch.id))
-        except ValueError:
-            pass
-
-    if ids:
-        settings[gid]["welcome_ghostpings"] = ids
-        save_settings(settings)
-        mentions = ", ".join(f"<#{cid}>" for cid in ids)
-        await interaction.response.send_message(f"Welcome ghostping configuré : {mentions}", ephemeral=True)
-    else:
-        settings[gid]["welcome_ghostpings"] = []
-        save_settings(settings)
-        await interaction.response.send_message("Welcome ghostping désactivé.", ephemeral=True)
-
-
-@bot.tree.command(name="welcome-ghostping-list", description="Affiche les salons de welcome ghostping")
-@app_commands.checks.has_permissions(administrator=True)
-async def welcome_ghostping_list(interaction: discord.Interaction):
-    settings = load_settings()
-    gid = str(interaction.guild.id)
-
-    channel_ids = settings.get(gid, {}).get("welcome_ghostpings", [])
-    if not channel_ids:
-        await interaction.response.send_message("Aucun salon de welcome ghostping configuré.", ephemeral=True)
-        return
-
-    lines = [f"<#{cid}>" for cid in channel_ids]
-    view = view_text("## Welcome Ghostping", "Salons configurés :", *lines)
-    await interaction.response.send_message(view=view, ephemeral=True)
-
-
-@bot.tree.command(name="welcome-ghostping-remove", description="Retire un salon du welcome ghostping")
-@app_commands.describe(channel="Le salon à retirer")
-@app_commands.checks.has_permissions(administrator=True)
-async def welcome_ghostping_remove(interaction: discord.Interaction, channel: discord.TextChannel):
-    settings = load_settings()
-    gid = str(interaction.guild.id)
-
-    if gid in settings and "welcome_ghostpings" in settings[gid]:
-        cid = str(channel.id)
-        if cid in settings[gid]["welcome_ghostpings"]:
-            settings[gid]["welcome_ghostpings"].remove(cid)
-            save_settings(settings)
-            await interaction.response.send_message(f"{channel.mention} retiré du welcome ghostping.", ephemeral=True)
+    if action == "add":
+        if not channels:
+            await interaction.response.send_message("指定至少一个频道。", ephemeral=True)
             return
+        ids = []
+        for c in channels.split():
+            c = c.strip("<#>")
+            try:
+                ch = interaction.guild.get_channel(int(c))
+                if ch:
+                    ids.append(str(ch.id))
+            except ValueError:
+                pass
+        existing = settings[gid].get("welcome_ghostpings", [])
+        existing.extend(ids)
+        settings[gid]["welcome_ghostpings"] = list(set(existing))
+        save_settings(settings)
+        mentions = ", ".join(f"<#{cid}>" for cid in settings[gid]["welcome_ghostpings"])
+        await interaction.response.send_message(f"Welcome ghostping : {mentions}", ephemeral=True)
 
-    await interaction.response.send_message(f"{channel.mention} n'est pas dans la liste.", ephemeral=True)
+    elif action == "list":
+        channel_ids = settings.get(gid, {}).get("welcome_ghostpings", [])
+        if not channel_ids:
+            await interaction.response.send_message("Aucun salon configuré.", ephemeral=True)
+            return
+        lines = [f"<#{cid}>" for cid in channel_ids]
+        view = view_text("## Welcome Ghostping", "Salons configurés :", *lines)
+        await interaction.response.send_message(view=view, ephemeral=True)
 
+    elif action == "remove":
+        if not channels:
+            await interaction.response.send_message("指定要移除的频道。", ephemeral=True)
+            return
+        if gid in settings and "welcome_ghostpings" in settings[gid]:
+            c = channels.strip("<#>")
+            try:
+                cid = str(int(c))
+                if cid in settings[gid]["welcome_ghostpings"]:
+                    settings[gid]["welcome_ghostpings"].remove(cid)
+                    save_settings(settings)
+                    await interaction.response.send_message(f"<#{cid}> retiré.", ephemeral=True)
+                    return
+            except ValueError:
+                pass
+        await interaction.response.send_message("Channel non trouvé dans la liste.", ephemeral=True)
 
-@bot.tree.command(name="welcome-ghostping-clear", description="Vide tous les salons de welcome ghostping")
-@app_commands.checks.has_permissions(administrator=True)
-async def welcome_ghostping_clear(interaction: discord.Interaction):
-    settings = load_settings()
-    gid = str(interaction.guild.id)
-
-    if gid in settings:
+    elif action == "clear":
         settings[gid]["welcome_ghostpings"] = []
         save_settings(settings)
+        await interaction.response.send_message("Welcome ghostping vidé.", ephemeral=True)
 
-    await interaction.response.send_message("Welcome ghostping vidé.", ephemeral=True)
 
-
-@bot.tree.command(name="autorole", description="Définit un rôle automatique à l'arrivée des membres")
+@config.command(name="autorole", description="Définit un rôle automatique à l'arrivée des membres")
 @app_commands.describe(role="Le rôle à attribuer (laisser vide pour désactiver)")
 @app_commands.checks.has_permissions(administrator=True)
 async def autorole(interaction: discord.Interaction, role: discord.Role = None):
@@ -640,7 +809,7 @@ async def autorole(interaction: discord.Interaction, role: discord.Role = None):
 #  MODERATION
 # ──────────────────────────────────────────────
 
-@bot.tree.command(name="warn", description="Avertir un membre")
+@mod.command(name="warn", description="Avertir un membre")
 @app_commands.describe(member="Le membre à warn", reason="Raison du warn")
 async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "Aucune raison"):
     if member.bot:
@@ -679,7 +848,7 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
         pass
 
 
-@bot.tree.command(name="warnings", description="Affiche les warns d'un membre")
+@mod.command(name="warnings", description="Affiche les warns d'un membre")
 @app_commands.describe(member="Le membre à inspecter")
 async def warnings(interaction: discord.Interaction, member: discord.Member):
     warns = load_warns()
@@ -707,7 +876,7 @@ async def warnings(interaction: discord.Interaction, member: discord.Member):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="clearwarns", description="Supprime les warns d'un membre")
+@mod.command(name="clearwarns", description="Supprime les warns d'un membre")
 @app_commands.describe(member="Le membre")
 @app_commands.checks.has_permissions(administrator=True)
 async def clearwarns(interaction: discord.Interaction, member: discord.Member):
@@ -724,7 +893,7 @@ async def clearwarns(interaction: discord.Interaction, member: discord.Member):
         await interaction.response.send_message("Aucun warn à supprimer.", ephemeral=True)
 
 
-@bot.tree.command(name="mute", description="Mute un membre (timeout)")
+@mod.command(name="mute", description="Mute un membre (timeout)")
 @app_commands.describe(member="Le membre", duration="Durée en minutes", reason="Raison")
 async def mute(interaction: discord.Interaction, member: discord.Member, duration: int = 10, reason: str = "Aucune raison"):
     if member.bot:
@@ -744,14 +913,14 @@ async def mute(interaction: discord.Interaction, member: discord.Member, duratio
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="unmute", description="Démute un membre")
+@mod.command(name="unmute", description="Démute un membre")
 @app_commands.describe(member="Le membre")
 async def unmute(interaction: discord.Interaction, member: discord.Member):
     await member.timeout(None)
     await interaction.response.send_message(f"{member.mention} a été démuté.")
 
 
-@bot.tree.command(name="kick", description="Expulser un membre du serveur")
+@mod.command(name="kick", description="Expulser un membre du serveur")
 @app_commands.describe(member="Le membre", reason="Raison")
 @app_commands.checks.has_permissions(kick_members=True)
 async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "Aucune raison"):
@@ -777,7 +946,7 @@ async def kick(interaction: discord.Interaction, member: discord.Member, reason:
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="ban", description="Bannir un membre du serveur")
+@mod.command(name="ban", description="Bannir un membre du serveur")
 @app_commands.describe(member="Le membre", reason="Raison", delete_days="Jours de messages à supprimer (0-7)")
 @app_commands.checks.has_permissions(ban_members=True)
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "Aucune raison", delete_days: int = 0):
@@ -804,7 +973,7 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="unban", description="Débannir un utilisateur")
+@mod.command(name="unban", description="Débannir un utilisateur")
 @app_commands.describe(user_id="ID de l'utilisateur à débannir")
 @app_commands.checks.has_permissions(ban_members=True)
 async def unban(interaction: discord.Interaction, user_id: str):
@@ -822,7 +991,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
         await interaction.response.send_message("Utilisateur non banni.", ephemeral=True)
 
 
-@bot.tree.command(name="timeout", description="Timeout un membre (format : 1h30m)")
+@mod.command(name="timeout", description="Timeout un membre (format : 1h30m)")
 @app_commands.describe(member="Le membre", duration="Durée (ex: 1h30m, 30m, 2d)", reason="Raison")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def timeout(interaction: discord.Interaction, member: discord.Member, duration: str, reason: str = "Aucune raison"):
@@ -860,7 +1029,7 @@ async def timeout(interaction: discord.Interaction, member: discord.Member, dura
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="purge", description="Supprimer des messages dans le salon")
+@mod.command(name="purge", description="Supprimer des messages dans le salon")
 @app_commands.describe(amount="Nombre de messages à supprimer (max 100)")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def purge(interaction: discord.Interaction, amount: int = 10):
@@ -873,95 +1042,7 @@ async def purge(interaction: discord.Interaction, amount: int = 10):
     await interaction.followup.send(f"`{len(deleted) - 1}` messages supprimés.", ephemeral=True)
 
 
-@bot.tree.command(name="slowmode", description="Définir le slowmode du salon")
-@app_commands.describe(seconds="Secondes de slowmode (0 = désactiver)")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def slowmode(interaction: discord.Interaction, seconds: int = 0):
-    await interaction.channel.edit(slowmode_delay=seconds)
-    if seconds == 0:
-        await interaction.response.send_message("Slowmode désactivé.")
-    else:
-        await interaction.response.send_message(f"Slowmode défini à `{seconds}` secondes.")
-
-
-@bot.tree.command(name="lock", description="Verrouiller le salon")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def lock(interaction: discord.Interaction):
-    await interaction.channel.set_permissions(
-        interaction.guild.default_role,
-        send_messages=False
-    )
-    await interaction.response.send_message(f" Salon verrouillé.")
-
-
-@bot.tree.command(name="unlock", description="Déverrouiller le salon")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def unlock(interaction: discord.Interaction):
-    await interaction.channel.set_permissions(
-        interaction.guild.default_role,
-        send_messages=None
-    )
-    await interaction.response.send_message(f" Salon déverrouillé.")
-
-
-@bot.tree.command(name="renew", description="Recrée le salon actuel avec les mêmes permissions")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def renew(interaction: discord.Interaction):
-    channel = interaction.guild.get_channel(interaction.channel.id)
-    category = channel.category
-    overwrites = channel.overwrites
-    name = channel.name
-    topic = channel.topic
-    nsfw = channel.nsfw
-    slowmode = channel.slowmode_delay
-
-    pos = channel.position
-    await channel.delete()
-
-    new_channel = await interaction.guild.create_text_channel(
-        name=name,
-        category=category,
-        overwrites=overwrites,
-        topic=topic,
-        nsfw=nsfw,
-        slowmode_delay=slowmode
-    )
-    await new_channel.edit(position=pos)
-    await new_channel.send(f"Salon recréé par {interaction.user.mention}.")
-
-
-@bot.tree.command(name="nuke", description="Supprime et recrée le salon (attention)")
-@app_commands.checks.has_permissions(administrator=True)
-async def nuke(interaction: discord.Interaction):
-    channel = interaction.guild.get_channel(interaction.channel.id)
-    category = channel.category
-    overwrites = channel.overwrites
-    name = channel.name
-    pos = channel.position
-
-    await channel.delete()
-
-    new_channel = await interaction.guild.create_text_channel(
-        name=name,
-        category=category,
-        overwrites=overwrites
-    )
-    await new_channel.edit(position=pos)
-    await new_channel.send(f"Salon nuké par {interaction.user.mention}.")
-
-
-@bot.tree.command(name="nick", description="Change le pseudo d'un membre")
-@app_commands.describe(member="Le membre", nickname="Nouveau pseudo (vide = reset)")
-@app_commands.checks.has_permissions(manage_nicknames=True)
-async def nick(interaction: discord.Interaction, member: discord.Member, nickname: str = ""):
-    await member.edit(nick=nickname or None)
-    if nickname:
-        await interaction.response.send_message(f"Pseudo de {member.mention} changé en `{nickname}`.")
-    else:
-        await interaction.response.send_message(f"Pseudo de {member.mention} réinitialisé.")
-
-
-@bot.tree.command(name="role", description="Ajoute ou retire un rôle à un membre")
+@mod.command(name="role", description="Ajoute ou retire un rôle à un membre")
 @app_commands.describe(member="Le membre", role="Le rôle à gérer")
 @app_commands.checks.has_permissions(manage_roles=True)
 async def role(interaction: discord.Interaction, member: discord.Member, role: discord.Role):
@@ -973,52 +1054,18 @@ async def role(interaction: discord.Interaction, member: discord.Member, role: d
         await interaction.response.send_message(f"Rôle `{role.name}` ajouté à {member.mention}.")
 
 
-@bot.tree.command(name="move", description="Déplace un membre dans un salon vocal")
-@app_commands.describe(member="Le membre", channel="Le salon vocal cible")
-@app_commands.checks.has_permissions(move_members=True)
-async def move(interaction: discord.Interaction, member: discord.Member, channel: discord.VoiceChannel):
-    if member.voice and member.voice.channel:
-        await member.move_to(channel)
-        await interaction.response.send_message(f"{member.mention} déplacé dans {channel.mention}.")
-    else:
-        await interaction.response.send_message("Le membre n'est pas en vocal.", ephemeral=True)
-
-
-@bot.tree.command(name="deafen", description="Rend sourd un membre en vocal")
-@app_commands.describe(member="Le membre")
-@app_commands.checks.has_permissions(deafen_members=True)
-async def deafen(interaction: discord.Interaction, member: discord.Member):
-    if member.voice and member.voice.channel:
-        await member.edit(deafen=not member.voice.deaf)
-        state = "rendu sourd" if not member.voice.deaf else "décoiffé"
-        await interaction.response.send_message(f"{member.mention} {state}.")
-    else:
-        await interaction.response.send_message("Le membre n'est pas en vocal.", ephemeral=True)
-
-
-@bot.tree.command(name="disconnect", description="Déconnecte un membre du vocal")
-@app_commands.describe(member="Le membre")
-@app_commands.checks.has_permissions(move_members=True)
-async def disconnect(interaction: discord.Interaction, member: discord.Member):
-    if member.voice and member.voice.channel:
-        await member.move_to(None)
-        await interaction.response.send_message(f"{member.mention} déconnecté du vocal.")
-    else:
-        await interaction.response.send_message("Le membre n'est pas en vocal.", ephemeral=True)
-
-
 # ──────────────────────────────────────────────
 #  UTILITAIRES
 # ──────────────────────────────────────────────
 
-@bot.tree.command(name="ping", description="Affiche la latence du bot")
+@util.command(name="ping", description="Affiche la latence du bot")
 async def ping(interaction: discord.Interaction):
     latency = round(bot.latency * 1000)
     view = view_text(f"## Ping", f"**Latence** `{latency}ms`")
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="avatar", description="Affiche l'avatar d'un membre")
+@util.command(name="avatar", description="Affiche l'avatar d'un membre")
 @app_commands.describe(member="Le membre")
 async def avatar(interaction: discord.Interaction, member: discord.Member = None):
     member = member or interaction.user
@@ -1029,7 +1076,7 @@ async def avatar(interaction: discord.Interaction, member: discord.Member = None
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="banner", description="Affiche la bannière d'un membre")
+@util.command(name="banner", description="Affiche la bannière d'un membre")
 @app_commands.describe(member="Le membre")
 async def banner(interaction: discord.Interaction, member: discord.Member = None):
     member = member or interaction.user
@@ -1044,7 +1091,7 @@ async def banner(interaction: discord.Interaction, member: discord.Member = None
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="serverinfo", description="Affiche les informations du serveur")
+@util.command(name="serverinfo", description="Affiche les informations du serveur")
 async def serverinfo(interaction: discord.Interaction):
     guild = interaction.guild
 
@@ -1070,7 +1117,7 @@ async def serverinfo(interaction: discord.Interaction):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="userinfo", description="Affiche les informations détaillées d'un membre")
+@util.command(name="userinfo", description="Affiche les informations détaillées d'un membre")
 @app_commands.describe(member="Le membre")
 async def userinfo(interaction: discord.Interaction, member: discord.Member = None):
     member = member or interaction.user
@@ -1106,7 +1153,7 @@ async def userinfo(interaction: discord.Interaction, member: discord.Member = No
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="members", description="Affiche la répartition des membres")
+@util.command(name="members", description="Affiche la répartition des membres")
 async def members(interaction: discord.Interaction):
     guild = interaction.guild
 
@@ -1132,7 +1179,7 @@ async def members(interaction: discord.Interaction):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="channels", description="Liste les salons du serveur")
+@util.command(name="channels", description="Liste les salons du serveur")
 async def channels(interaction: discord.Interaction):
     guild = interaction.guild
     text = [c.mention for c in guild.text_channels]
@@ -1160,7 +1207,7 @@ async def channels(interaction: discord.Interaction):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="roles", description="Affiche la liste des rôles du serveur")
+@util.command(name="roles", description="Affiche la liste des rôles du serveur")
 async def roles(interaction: discord.Interaction):
     guild = interaction.guild
     sorted_roles = sorted(guild.roles[1:], key=lambda r: r.position, reverse=True)
@@ -1183,7 +1230,7 @@ async def roles(interaction: discord.Interaction):
         )
 
 
-@bot.tree.command(name="emojis", description="Affiche les emojis du serveur")
+@util.command(name="emojis", description="Affiche les emojis du serveur")
 async def emojis(interaction: discord.Interaction):
     guild = interaction.guild
     emojis = guild.emojis
@@ -1206,7 +1253,7 @@ async def emojis(interaction: discord.Interaction):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="boosts", description="Affiche les boosters du serveur")
+@util.command(name="boosts", description="Affiche les boosters du serveur")
 async def boosts(interaction: discord.Interaction):
     guild = interaction.guild
     boosters = [m for m in guild.members if m.premium_since]
@@ -1225,7 +1272,7 @@ async def boosts(interaction: discord.Interaction):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="say", description="Le bot envoie un message")
+@util.command(name="say", description="Le bot envoie un message")
 @app_commands.describe(message="Le message à envoyer", channel="Le salon cible")
 @app_commands.checks.has_permissions(administrator=True)
 async def say(interaction: discord.Interaction, message: str, channel: discord.TextChannel = None):
@@ -1234,7 +1281,7 @@ async def say(interaction: discord.Interaction, message: str, channel: discord.T
     await channel.send(message)
 
 
-@bot.tree.command(name="embed", description="Crée un embed personnalisé")
+@util.command(name="embed", description="Crée un embed personnalisé")
 @app_commands.describe(title="Titre", description="Description", channel="Salon cible")
 @app_commands.checks.has_permissions(administrator=True)
 async def embed(interaction: discord.Interaction, title: str, description: str, channel: discord.TextChannel = None):
@@ -1244,7 +1291,7 @@ async def embed(interaction: discord.Interaction, title: str, description: str, 
     await channel.send(view=view)
 
 
-@bot.tree.command(name="poll", description="Crée un sondage")
+@util.command(name="poll", description="Crée un sondage")
 @app_commands.describe(question="La question", option1="Option 1", option2="Option 2", option3="Option 3 (optionnel)", option4="Option 4 (optionnel)")
 async def poll(interaction: discord.Interaction, question: str, option1: str, option2: str, option3: str = None, option4: str = None):
     options = [option1, option2]
@@ -1265,177 +1312,164 @@ async def poll(interaction: discord.Interaction, question: str, option1: str, op
 
 
 HELP_CATEGORIES = {
-    "moderation": {
+    "mod": {
         "label": "Modération",
         "emoji": "<:moderation:1543707525185142948>",
         "commands": [
-            "`/warn` — Avertir un membre",
-            "`/warnings` — Affiche les warns d'un membre",
-            "`/clearwarns` — Supprime les warns",
-            "`/mute` — Mute un membre (timeout)",
-            "`/unmute` — Démute un membre",
-            "`/timeout` — Timeout (format: 1h30m)",
-            "`/kick` — Expulser un membre",
-            "`/ban` — Bannir un membre",
-            "`/unban` — Débannir un utilisateur",
-            "`/softban` — Ban + unban (purge messages)",
-            "`/purge` — Supprimer des messages",
-            "`/slowmode` — Définir le slowmode",
-            "`/lock` / `/unlock` — Verrouiller / déverrouiller le salon",
-            "`/nick` — Changer le pseudo",
-            "`/role` — Ajouter / retirer un rôle",
+            "`/mod warn` — Avertir un membre",
+            "`/mod warnings` — Affiche les warns",
+            "`/mod clearwarns` — Supprime les warns",
+            "`/mod mute` — Mute (timeout)",
+            "`/mod unmute` — Démute",
+            "`/mod timeout` — Timeout (1h30m)",
+            "`/mod kick` — Expulser",
+            "`/mod ban` — Bannir",
+            "`/mod unban` — Débannir",
+            "`/mod softban` — Ban + unban (purge)",
+            "`/mod jail` — Prison (toggle)",
+            "`/mod history` — Historique modération",
+            "`/mod case` — Voir un case",
+            "`/mod purge` — Supprimer des messages",
+            "`/mod role` — Ajouter/retirer un rôle",
+            "`/mod mod-log` — Configurer les logs",
         ]
     },
-    "mod-avancee": {
-        "label": "Modération avancée",
+    "config": {
+        "label": "Configuration",
         "emoji": "<:mod_avancee:1543707521401884843>",
         "commands": [
-            "`/jail` — Envoyer en prison (ou libérer)",
-            "`/jail-remove` — Libérer de la prison",
-            "`/history` — Historique de modération",
-            "`/case` — Voir un case précis",
-            "`/mod-log` — Configurer le salon de logs",
-        ]
-    },
-    "vocal": {
-        "label": "Vocal",
-        "emoji": "<:vocal:1543707539764416572>",
-        "commands": [
-            "`/move` — Déplacer un membre en vocal",
-            "`/deafen` — Rendre sourd un membre",
-            "`/disconnect` — Déconnecter du vocal",
-        ]
-    },
-    "utilitaires": {
-        "label": "Utilitaires",
-        "emoji": "<:utilitaires:1543707537696628857>",
-        "commands": [
-            "`/ping` — Latence du bot",
-            "`/uptime` — Temps de fonctionnement",
-            "`/bot-info` — Infos sur le bot",
-            "`/afk` — Mode AFK",
-            "`/remind` — Rappel automatique",
-            "`/renew` — Recréer le salon",
-            "`/nuke` — Supprimer et recréer le salon",
-            "`/say` — Le bot envoie un message",
-            "`/embed` — Créer un embed personnalisé",
-            "`/poll` — Créer un sondage",
-        ]
-    },
-    "fun": {
-        "label": "Fun",
-        "emoji": "<:fun:1543707513273196736>",
-        "commands": [
-            "`/coinflip` — Pile ou face",
-            "`/dice` — Lancer de dé",
-            "`/8ball` — Boule magique",
-            "`/ship` — Compatibilité entre membres",
-            "`/rate` — Noter quelque chose sur 10",
-        ]
-    },
-    "info": {
-        "label": "Infos & Stats",
-        "emoji": "<:stats:1543707530671427685>",
-        "commands": [
-            "`/userinfo` — Infos détaillées d'un membre",
-            "`/serverinfo` — Infos du serveur",
-            "`/members` — Répartition des membres",
-            "`/channels` — Liste des salons",
-            "`/roles` — Liste des rôles",
-            "`/emojis` — Liste des emojis",
-            "`/boosts` — Liste des boosters",
-            "`/avatar` — Avatar d'un membre",
-            "`/banner` — Bannière d'un membre",
-            "`/stats-user` — Stats d'un membre",
-            "`/statistique` — Stats du serveur",
-        ]
-    },
-    "hierarchie": {
-        "label": "Hiérarchie",
-        "emoji": "<:hierarchie:1543707518847680512>",
-        "commands": [
-            "`/effectif` — Effectif complet du serveur (rôles + membres)",
-            "`/hierarchie` — Hiérarchie complète des rôles",
-            "`/staff` — Hiérarchie des rôles staff",
-            "`/set-staff-roles` — Configurer les rôles staff",
-        ]
-    },
-    "tickets": {
-        "label": "Tickets",
-        "emoji": "<:tickets:1543707535796600942>",
-        "commands": [
-            "`/ticket-setup` — Setup complet des tickets",
-            "`/ticket-panel` — Envoyer le panel de tickets",
-            "`/ticket-config` — Configurer le panel (titre, couleur, catégorie...)",
-            "`/ticket-types` — Gérer les types de tickets (add/remove/list)",
-            "`/set-ticket-channel` — Définir le canal de tickets",
-            "`/close` — Fermer le ticket actuel",
-            "`/ticket-add` — Ajouter un membre au ticket",
-            "`/ticket-remove` — Retirer un membre du ticket",
-            "`/tickets` — Liste des tickets",
-            "`/ticket-transcript` — Générer un transcript",
-            "`/ticket-force-close` — Forcer la fermeture",
-        ]
-    },
-    "backup": {
-        "label": "Backup",
-        "emoji": "💾",
-        "commands": [
-            "`/backup-create` — Créer une backup du serveur",
-            "`/backup-list` — Liste les backups",
-            "`/backup-restore` — Restaurer une backup",
-            "`/backup-delete` — Supprimer une backup",
-        ]
-    },
-    "ghostping": {
-        "label": "Ghostping & Autorole",
-        "emoji": "<:ghostping:1543707515995295876>",
-        "commands": [
-            "`/ghostping` — Ghostping tous les membres d'un salon",
-            "`/welcome-ghostping` — Config les ghostpings d'accueil",
-            "`/welcome-ghostping-list` — Liste des salons ghostping",
-            "`/welcome-ghostping-remove` — Retirer un salon",
-            "`/welcome-ghostping-clear` — Vider la liste",
-            "`/autorole` — Définir le rôle automatique",
+            "`/config staff-roles` — Rôles staff",
+            "`/config ticket-channel` — Canal de tickets",
+            "`/config automod` — Anti-link / Anti-spam",
+            "`/config autorole` — Rôle automatique",
+            "`/config mod-panel` — Panel modération",
         ]
     },
     "welcome": {
         "label": "Welcome & Goodbye",
         "emoji": "<:welcome:1543707541702185041>",
         "commands": [
-            "`/welcome` — Configurer l'accueil (channel + message + image Canvas)",
-            "`/welcome-preview` — Aperçu du message d'accueil",
-            "`/welcome-disable` — Désactiver l'accueil",
-            "`/goodbye` — Configurer le départ (channel + message + image Canvas)",
-            "`/goodbye-preview` — Aperçu du message de départ",
-            "`/goodbye-disable` — Désactiver le départ",
-            "`/boost` — Configurer les boosts (channel + message + image Canvas)",
-            "`/boost-preview` — Aperçu du message de boost",
-            "`/boost-disable` — Désactiver les boosts",
+            "`/welcome setup` — Configurer l'accueil",
+            "`/welcome disable` — Désactiver l'accueil",
+            "`/welcome preview` — Aperçu accueil",
+            "`/welcome ghostping` — Ghostpings d'accueil",
+            "`/welcome goodbye` — Configurer le départ",
+            "`/welcome boost` — Configurer les boosts",
+            "`/welcome panel` — Panel interactif",
+            "`/welcome goodbye-panel` — Panel goodbye",
+            "`/welcome boost-panel` — Panel boost",
         ]
     },
-    "automod": {
-        "label": "Automod & Anti-raid",
+    "ticket": {
+        "label": "Tickets",
+        "emoji": "<:tickets:1543707535796600942>",
+        "commands": [
+            "`/ticket setup` — Setup complet",
+            "`/ticket panel` — Envoyer le panel",
+            "`/ticket config` — Configurer le panel",
+            "`/ticket types` — Gérer les types",
+            "`/ticket add` — Ajouter un membre",
+            "`/ticket remove` — Retirer un membre",
+            "`/ticket list` — Liste des tickets",
+            "`/ticket transcript` — Générer un transcript",
+            "`/ticket force-close` — Fermer forcé",
+            "`/ticket close` — Fermer le ticket",
+        ]
+    },
+    "music": {
+        "label": "Musique",
+        "emoji": "🎵",
+        "commands": [
+            "`/music play` — Jouer une musique",
+            "`/music pause` — Pause",
+            "`/music resume` — Reprendre",
+            "`/music skip` — Passer",
+            "`/music stop` — Arrêter",
+            "`/music queue` — File d'attente",
+            "`/music nowplaying` — En cours",
+            "`/music volume` — Volume (0-100)",
+            "`/music disconnect` — Déconnecter",
+        ]
+    },
+    "util": {
+        "label": "Utilitaires",
+        "emoji": "<:utilitaires:1543707537696628857>",
+        "commands": [
+            "`/util ping` — Latence",
+            "`/util uptime` — Temps de fonctionnement",
+            "`/util bot-info` — Infos bot",
+            "`/util avatar` — Avatar d'un membre",
+            "`/util banner` — Bannière",
+            "`/util serverinfo` — Infos serveur",
+            "`/util userinfo` — Infos membre",
+            "`/util members` — Répartition membres",
+            "`/util channels` — Liste salons",
+            "`/util roles` — Liste rôles",
+            "`/util emojis` — Liste emojis",
+            "`/util boosts` — Liste boosters",
+            "`/util say` — Bot envoie un message",
+            "`/util embed` — Embed personnalisé",
+            "`/util poll` — Sondage",
+            "`/util help` — Aide",
+            "`/util effectif` — Effectif complet",
+            "`/util hierarchie` — Hiérarchie rôles",
+            "`/util staff` — Hiérarchie staff",
+            "`/util afk` — Mode AFK",
+            "`/util remind` — Rappel automatique",
+        ]
+    },
+    "fun": {
+        "label": "Fun",
+        "emoji": "<:fun:1543707513273196736>",
+        "commands": [
+            "`/fun coinflip` — Pile ou face",
+            "`/fun dice` — Lancer de dé",
+            "`/fun 8ball` — Boule magique",
+            "`/fun ship` — Compatibilité",
+            "`/fun rate` — Noter sur 10",
+        ]
+    },
+    "backup": {
+        "label": "Backup",
+        "emoji": "💾",
+        "commands": [
+            "`/backup create` — Créer une backup",
+            "`/backup list` — Liste les backups",
+            "`/backup restore` — Restaurer",
+            "`/backup delete` — Supprimer",
+        ]
+    },
+    "stats": {
+        "label": "Statistiques",
+        "emoji": "<:stats:1543707530671427685>",
+        "commands": [
+            "`/stats user` — Stats d'un membre",
+            "`/stats server` — Stats du serveur",
+        ]
+    },
+    "raid": {
+        "label": "Anti-raid",
         "emoji": "<:automod:1543707507631853683>",
         "commands": [
-            "`/automod` — Anti-link / Anti-spam on/off",
-            "`/anti-raid` — Configurer l'anti-raid avancé",
-            "`/raid-log` — Salon de logs anti-raid",
-            "`/raid-status` — Voir la config anti-raid",
-            "`/raid-whitelist` — Gérer la whitelist anti-raid",
-            "`/ai` — Activer/désactiver l'IA insolente",
+            "`/raid config` — Configurer l'anti-raid",
+            "`/raid log` — Salon de logs",
+            "`/raid status` — Voir la config",
+            "`/raid whitelist` — Gérer la whitelist",
         ]
     },
-    "salon": {
-        "label": "Gestion de salon",
-        "emoji": "<:salon:1543707529039577128>",
+    "ghostping": {
+        "label": "Ghostping",
+        "emoji": "<:ghostping:1543707515995295876>",
         "commands": [
-            "`/clone` — Dupliquer le salon",
-            "`/hide` — Cacher le salon",
-            "`/unhide` — Rendre le salon visible",
-            "`/archive` — Archiver le salon en transcript",
-            "`/lock-all` — Verrouiller tous les salons",
-            "`/unlock-all` — Déverrouiller tous les salons",
+            "`/ghostping send` — Ghostping un salon",
+        ]
+    },
+    "ai": {
+        "label": "IA Insolente",
+        "emoji": "🤖",
+        "commands": [
+            "`/ai toggle` — Activer/désactiver l'IA",
+            "`/ai panel` — Panel de configuration",
         ]
     },
 }
@@ -1478,7 +1512,7 @@ def make_help_view(category_key):
     return view
 
 
-@bot.tree.command(name="help", description="Affiche la liste des commandes par catégorie")
+@util.command(name="help", description="Affiche la liste des commandes par catégorie")
 @app_commands.describe(category="Catégorie de commandes")
 @app_commands.choices(category=[
     app_commands.Choice(name=f"{v['emoji']} {v['label']}", value=k)
@@ -1498,7 +1532,7 @@ HELP_PERSISTENT_CATEGORY = "moderation"
 #  HIERARCHIE
 # ──────────────────────────────────────────────
 
-@bot.tree.command(name="effectif", description="Affiche l'effectif complet du serveur par rôle")
+@util.command(name="effectif", description="Affiche l'effectif complet du serveur par rôle")
 @app_commands.checks.has_permissions(administrator=True)
 async def effectif(interaction: discord.Interaction):
     await interaction.response.defer()
@@ -1537,7 +1571,7 @@ async def effectif(interaction: discord.Interaction):
         await interaction.followup.send(view=view_text(content))
 
 
-@bot.tree.command(name="hierarchie", description="Affiche la hiérarchie complète des rôles")
+@util.command(name="hierarchie", description="Affiche la hiérarchie complète des rôles")
 async def hierarchie(interaction: discord.Interaction):
     guild = interaction.guild
     sorted_roles = sorted(guild.roles[1:], key=lambda r: r.position, reverse=True)
@@ -1565,7 +1599,7 @@ STAFF_ROLE_MIN = 1542695791821328386
 STAFF_ROLE_MAX = 1542695847622352896
 
 
-@bot.tree.command(name="staff", description="Affiche la hiérarchie des rôles staff")
+@util.command(name="staff", description="Affiche la hiérarchie des rôles staff")
 async def staff(interaction: discord.Interaction):
     await interaction.response.defer()
     guild = interaction.guild
@@ -1593,7 +1627,7 @@ async def staff(interaction: discord.Interaction):
     await interaction.followup.send(view=view)
 
 
-@bot.tree.command(name="set-staff-roles", description="Définir les rôles staff (laisser vide = tous les admins)")
+@config.command(name="staff-roles", description="Définir les rôles staff (laisser vide = tous les admins)")
 @app_commands.describe(roles="Les rôles à considérer comme staff")
 @app_commands.checks.has_permissions(administrator=True)
 async def set_staff_roles(interaction: discord.Interaction, roles: str = ""):
@@ -1616,7 +1650,7 @@ async def set_staff_roles(interaction: discord.Interaction, roles: str = ""):
 #  STATS
 # ──────────────────────────────────────────────
 
-@bot.tree.command(name="stats-user", description="Affiche les statistiques d'un membre")
+@stats.command(name="user", description="Affiche les statistiques d'un membre")
 @app_commands.describe(member="Le membre à inspecter")
 async def stats_user(interaction: discord.Interaction, member: discord.Member):
     roles = [r.mention for r in member.roles[1:]][::-1]
@@ -1645,7 +1679,7 @@ async def stats_user(interaction: discord.Interaction, member: discord.Member):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="statistique", description="Affiche les statistiques du serveur")
+@stats.command(name="server", description="Affiche les statistiques du serveur")
 async def statistique(interaction: discord.Interaction):
     guild = interaction.guild
 
@@ -1740,7 +1774,7 @@ def save_backups(data):
         json.dump(data, f, indent=2)
 
 
-@bot.tree.command(name="backup-create", description="Créer une backup du serveur (rôles + salons)")
+@backup.command(name="create", description="Créer une backup du serveur (rôles + salons)")
 @app_commands.checks.has_permissions(administrator=True)
 async def backup_create(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
@@ -1813,7 +1847,7 @@ async def backup_create(interaction: discord.Interaction):
     await interaction.followup.send(view=view)
 
 
-@bot.tree.command(name="backup-list", description="Affiche les backups du serveur")
+@backup.command(name="list", description="Affiche les backups du serveur")
 @app_commands.checks.has_permissions(administrator=True)
 async def backup_list(interaction: discord.Interaction):
     backups = load_backups()
@@ -1837,7 +1871,7 @@ async def backup_list(interaction: discord.Interaction):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="backup-restore", description="Restaurer une backup du serveur")
+@backup.command(name="restore", description="Restaurer une backup du serveur")
 @app_commands.describe(backup_id="L'ID de la backup à restaurer")
 @app_commands.checks.has_permissions(administrator=True)
 async def backup_restore(interaction: discord.Interaction, backup_id: str):
@@ -1917,7 +1951,7 @@ async def backup_restore(interaction: discord.Interaction, backup_id: str):
     await interaction.followup.send(view=view)
 
 
-@bot.tree.command(name="backup-delete", description="Supprimer une backup")
+@backup.command(name="delete", description="Supprimer une backup")
 @app_commands.describe(backup_id="L'ID de la backup à supprimer")
 @app_commands.checks.has_permissions(administrator=True)
 async def backup_delete(interaction: discord.Interaction, backup_id: str):
@@ -1970,7 +2004,7 @@ def save_ticket_config(guild_id, config):
     save_settings(settings)
 
 
-@bot.tree.command(name="ticket-config", description="Configurer le système de tickets")
+@ticket.command(name="config", description="Configurer le système de tickets")
 @app_commands.describe(
     titre="Titre du panel de tickets",
     description="Description du panel",
@@ -2050,7 +2084,7 @@ async def ticket_config(
     )
 
 
-@bot.tree.command(name="ticket-types", description="Gérer les types de tickets")
+@ticket.command(name="types", description="Gérer les types de tickets")
 @app_commands.describe(
     action="Ajouter, retirer ou lister",
     cle="Clé du type (ex: bug)",
@@ -2127,7 +2161,7 @@ async def ticket_types(
         await interaction.response.send_message("Types de tickets réinitialisés aux défauts.", ephemeral=True)
 
 
-@bot.tree.command(name="ticket-panel", description="Envoie le panel de tickets")
+@ticket.command(name="panel", description="Envoie le panel de tickets")
 @app_commands.checks.has_permissions(administrator=True)
 async def ticket_panel(interaction: discord.Interaction):
     settings = load_settings()
@@ -2277,7 +2311,7 @@ async def handle_ticket_open(interaction: discord.Interaction, ticket_type: str,
     await channel.send(view=view)
 
 
-@bot.tree.command(name="ticket-setup", description="Setup complet du système de tickets")
+@ticket.command(name="setup", description="Setup complet du système de tickets")
 @app_commands.checks.has_permissions(administrator=True)
 async def ticket_setup(interaction: discord.Interaction):
     settings = load_settings()
@@ -2342,7 +2376,7 @@ async def ticket_setup(interaction: discord.Interaction):
     await interaction.response.send_message(f"Setup envoyé dans {channel.mention}.", ephemeral=True)
 
 
-@bot.tree.command(name="set-ticket-channel", description="Définir le canal de tickets")
+@config.command(name="ticket-channel", description="Définir le canal de tickets")
 @app_commands.checks.has_permissions(administrator=True)
 async def set_ticket_channel(interaction: discord.Interaction, channel: discord.TextChannel):
     settings = load_settings()
@@ -2357,7 +2391,7 @@ async def set_ticket_channel(interaction: discord.Interaction, channel: discord.
     )
 
 
-@bot.tree.command(name="close", description="Ferme le ticket actuel")
+@ticket.command(name="close", description="Ferme le ticket actuel")
 async def close_ticket(interaction: discord.Interaction):
     if not interaction.channel.name.startswith("ticket-"):
         await interaction.response.send_message("Ce n'est pas un salon de ticket.", ephemeral=True)
@@ -2409,7 +2443,7 @@ async def close_ticket(interaction: discord.Interaction):
             )
 
 
-@bot.tree.command(name="ticket-add", description="Ajoute un membre au ticket")
+@ticket.command(name="add", description="Ajoute un membre au ticket")
 @app_commands.describe(member="Le membre à ajouter")
 async def ticket_add(interaction: discord.Interaction, member: discord.Member):
     if not interaction.channel.name.startswith("ticket-"):
@@ -2419,7 +2453,7 @@ async def ticket_add(interaction: discord.Interaction, member: discord.Member):
     await interaction.response.send_message(f"{member.mention} ajouté au ticket.")
 
 
-@bot.tree.command(name="ticket-remove", description="Retire un membre du ticket")
+@ticket.command(name="remove", description="Retire un membre du ticket")
 @app_commands.describe(member="Le membre à retirer")
 async def ticket_remove(interaction: discord.Interaction, member: discord.Member):
     if not interaction.channel.name.startswith("ticket-"):
@@ -2429,7 +2463,7 @@ async def ticket_remove(interaction: discord.Interaction, member: discord.Member
     await interaction.response.send_message(f"{member.mention} retiré du ticket.")
 
 
-@bot.tree.command(name="tickets", description="Liste tous les tickets")
+@ticket.command(name="list", description="Liste tous les tickets")
 @app_commands.checks.has_permissions(administrator=True)
 async def tickets_list(interaction: discord.Interaction):
     tickets = load_tickets()
@@ -2469,7 +2503,7 @@ async def tickets_list(interaction: discord.Interaction):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="ticket-transcript", description="Génère un transcript du ticket")
+@ticket.command(name="transcript", description="Génère un transcript du ticket")
 @app_commands.checks.has_permissions(administrator=True)
 async def ticket_transcript(interaction: discord.Interaction):
     if not interaction.channel.name.startswith("ticket-"):
@@ -2488,7 +2522,7 @@ async def ticket_transcript(interaction: discord.Interaction):
     await interaction.channel.send(file=file)
 
 
-@bot.tree.command(name="ticket-force-close", description="Ferme forcé un ticket par ID")
+@ticket.command(name="force-close", description="Ferme forcé un ticket par ID")
 @app_commands.describe(channel_id="ID du salon ticket")
 @app_commands.checks.has_permissions(administrator=True)
 async def ticket_force_close(interaction: discord.Interaction, channel_id: str):
@@ -2565,7 +2599,7 @@ async def log_mod(guild, action, moderator, member, reason="Aucune raison"):
 #  MODÉRATION AVANCÉE
 # ──────────────────────────────────────────────
 
-@bot.tree.command(name="softban", description="Ban puis unban immédiat pour purger les messages")
+@mod.command(name="softban", description="Ban puis unban immédiat pour purger les messages")
 @app_commands.describe(member="Le membre", reason="Raison")
 @app_commands.checks.has_permissions(ban_members=True)
 async def softban(interaction: discord.Interaction, member: discord.Member, reason: str = "Aucune raison"):
@@ -2597,7 +2631,7 @@ async def softban(interaction: discord.Interaction, member: discord.Member, reas
 JAIL_ROLE_NAME = "Jailed"
 
 
-@bot.tree.command(name="jail", description="Envoie un membre en prison (ou le libère)")
+@mod.command(name="jail", description="Envoie un membre en prison (ou le libère)")
 @app_commands.describe(member="Le membre")
 @app_commands.checks.has_permissions(administrator=True)
 async def jail(interaction: discord.Interaction, member: discord.Member):
@@ -2656,41 +2690,8 @@ async def jail(interaction: discord.Interaction, member: discord.Member):
         await interaction.response.send_message(f"{member.mention} envoyé en prison.")
 
 
-@app_commands.checks.has_permissions(administrator=True)
-@bot.tree.command(name="jail-remove", description="Libère un membre de la prison")
-@app_commands.describe(member="Le membre")
-async def jail_remove(interaction: discord.Interaction, member: discord.Member):
-    guild = interaction.guild
-    jail_role = discord.utils.get(guild.roles, name=JAIL_ROLE_NAME)
-    if not jail_role or jail_role not in member.roles:
-        await interaction.response.send_message(f"{member.mention} n'est pas en prison.", ephemeral=True)
-        return
 
-    warns = load_warns()
-    gid = str(guild.id)
-    mid = str(member.id)
-    backup = []
-    user_warns = warns.get(gid, {}).get(mid, [])
-    for w in user_warns:
-        if w.get("reason", "").startswith("[JAIL]") and "backup_roles" in w:
-            backup = w["backup_roles"]
-            user_warns.remove(w)
-            break
-    save_warns(warns)
-
-    await member.remove_roles(jail_role)
-    for rid in backup:
-        role = guild.get_role(rid)
-        if role:
-            try:
-                await member.add_roles(role)
-            except discord.Forbidden:
-                pass
-
-    await interaction.response.send_message(f"{member.mention} libéré de la prison.")
-
-
-@bot.tree.command(name="history", description="Affiche l'historique de modération d'un membre")
+@mod.command(name="history", description="Affiche l'historique de modération d'un membre")
 @app_commands.describe(member="Le membre")
 @app_commands.checks.has_permissions(moderate_members=True)
 async def history(interaction: discord.Interaction, member: discord.Member):
@@ -2718,7 +2719,7 @@ async def history(interaction: discord.Interaction, member: discord.Member):
 
 
 @app_commands.checks.has_permissions(moderate_members=True)
-@bot.tree.command(name="case", description="Affiche un case de modération")
+@mod.command(name="case", description="Affiche un case de modération")
 @app_commands.describe(case_id="Numéro du case")
 async def case_cmd(interaction: discord.Interaction, case_id: int):
     mod_log = load_mod_log()
@@ -2753,174 +2754,168 @@ async def case_cmd(interaction: discord.Interaction, case_id: int):
 #  WELCOME / GOODBYE / BOOST CONFIG
 # ──────────────────────────────────────────────
 
-@bot.tree.command(name="welcome", description="Configure le message d'accueil avec image Canvas")
+@welcome.command(name="setup", description="Configure l'accueil (setup/disable/preview)")
 @app_commands.describe(
-    channel="Salon d'accueil",
+    action="Action",
+    channel="Salon d'accueil (setup uniquement)",
     message="Message (variables : {user}, {server}, {count})",
-    image="Afficher l'image Canvas (on/off)"
+    image="Image Canvas (on/off)"
 )
-@app_commands.choices(image=[
+@app_commands.choices(action=[
+    app_commands.Choice(name="setup", value="setup"),
+    app_commands.Choice(name="disable", value="disable"),
+    app_commands.Choice(name="preview", value="preview"),
+], image=[
     app_commands.Choice(name="on", value="on"),
     app_commands.Choice(name="off", value="off"),
 ])
 @app_commands.checks.has_permissions(administrator=True)
-async def welcome(interaction: discord.Interaction, channel: discord.TextChannel, message: str = "Bienvenue {user} sur **{server}** !", image: str = "on"):
+async def welcome_setup(interaction: discord.Interaction, action: str, channel: discord.TextChannel = None, message: str = "Bienvenue {user} sur **{server}** !", image: str = "on"):
     settings = load_settings()
     gid = str(interaction.guild.id)
     if gid not in settings:
         settings[gid] = {}
-    settings[gid]["welcome_channel"] = channel.id
-    settings[gid]["welcome_message"] = message
-    settings[gid]["welcome_image"] = image == "on"
-    save_settings(settings)
 
-    file = await generate_welcome_image(interaction.user)
-    preview_msg = message.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
-    await interaction.response.send_message(
-        f"Configuration d'accueil enregistrée dans {channel.mention}.\n"
-        f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`\n\n"
-        f"**Aperçu :**\n{preview_msg}",
-        file=file
-    )
-
-
-@bot.tree.command(name="welcome-disable", description="Désactive le message d'accueil")
-@app_commands.checks.has_permissions(administrator=True)
-async def welcome_disable(interaction: discord.Interaction):
-    settings = load_settings()
-    gid = str(interaction.guild.id)
-    if gid in settings:
+    if action == "disable":
         settings[gid].pop("welcome_channel", None)
         settings[gid].pop("welcome_message", None)
         settings[gid].pop("welcome_image", None)
         save_settings(settings)
-    await interaction.response.send_message("Message d'accueil désactivé.")
+        await interaction.response.send_message("Message d'accueil désactivé.")
+
+    elif action == "preview":
+        s = settings.get(gid, {})
+        msg = s.get("welcome_message", "Bienvenue {user} sur **{server}** !")
+        msg = msg.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
+        file = await generate_welcome_image(interaction.user)
+        await interaction.response.send_message(f"**Aperçu :**\n{msg}", file=file, ephemeral=True)
+
+    else:
+        if not channel:
+            await interaction.response.send_message("Salon requis pour le setup.", ephemeral=True)
+            return
+        settings[gid]["welcome_channel"] = channel.id
+        settings[gid]["welcome_message"] = message
+        settings[gid]["welcome_image"] = image == "on"
+        save_settings(settings)
+        file = await generate_welcome_image(interaction.user)
+        preview_msg = message.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
+        await interaction.response.send_message(
+            f"Accueil configuré dans {channel.mention}.\n"
+            f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`\n\n"
+            f"**Aperçu :**\n{preview_msg}",
+            file=file
+        )
 
 
-@bot.tree.command(name="welcome-preview", description="Aperçu du message d'accueil")
-@app_commands.checks.has_permissions(administrator=True)
-async def welcome_preview(interaction: discord.Interaction):
-    settings = load_settings()
-    gid = str(interaction.guild.id)
-    s = settings.get(gid, {})
-    msg = s.get("welcome_message", "Bienvenue {user} sur **{server}** !")
-    msg = msg.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
-    file = await generate_welcome_image(interaction.user)
-    await interaction.response.send_message(f"**Aperçu :**\n{msg}", file=file, ephemeral=True)
-
-
-@bot.tree.command(name="goodbye", description="Configure le message de départ avec image Canvas")
+@welcome.command(name="goodbye", description="Configure le départ (setup/disable/preview)")
 @app_commands.describe(
-    channel="Salon de départ",
+    action="Action",
+    channel="Salon de départ (setup uniquement)",
     message="Message (variables : {user}, {server}, {count})",
-    image="Afficher l'image Canvas (on/off)"
+    image="Image Canvas (on/off)"
 )
-@app_commands.choices(image=[
+@app_commands.choices(action=[
+    app_commands.Choice(name="setup", value="setup"),
+    app_commands.Choice(name="disable", value="disable"),
+    app_commands.Choice(name="preview", value="preview"),
+], image=[
     app_commands.Choice(name="on", value="on"),
     app_commands.Choice(name="off", value="off"),
 ])
 @app_commands.checks.has_permissions(administrator=True)
-async def goodbye(interaction: discord.Interaction, channel: discord.TextChannel, message: str = "**{user}** a quitté **{server}**.", image: str = "on"):
+async def goodbye(interaction: discord.Interaction, action: str, channel: discord.TextChannel = None, message: str = "**{user}** a quitté **{server}**.", image: str = "on"):
     settings = load_settings()
     gid = str(interaction.guild.id)
     if gid not in settings:
         settings[gid] = {}
-    settings[gid]["goodbye_channel"] = channel.id
-    settings[gid]["goodbye_message"] = message
-    settings[gid]["goodbye_image"] = image == "on"
-    save_settings(settings)
 
-    file = await generate_goodbye_image(interaction.user)
-    preview_msg = message.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
-    await interaction.response.send_message(
-        f"Configuration de départ enregistrée dans {channel.mention}.\n"
-        f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`\n\n"
-        f"**Aperçu :**\n{preview_msg}",
-        file=file
-    )
-
-
-@bot.tree.command(name="goodbye-disable", description="Désactive le message de départ")
-@app_commands.checks.has_permissions(administrator=True)
-async def goodbye_disable(interaction: discord.Interaction):
-    settings = load_settings()
-    gid = str(interaction.guild.id)
-    if gid in settings:
+    if action == "disable":
         settings[gid].pop("goodbye_channel", None)
         settings[gid].pop("goodbye_message", None)
         settings[gid].pop("goodbye_image", None)
         save_settings(settings)
-    await interaction.response.send_message("Message de départ désactivé.")
+        await interaction.response.send_message("Message de départ désactivé.")
+
+    elif action == "preview":
+        s = settings.get(gid, {})
+        msg = s.get("goodbye_message", "**{user}** a quitté **{server}**.")
+        msg = msg.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
+        file = await generate_goodbye_image(interaction.user)
+        await interaction.response.send_message(f"**Aperçu :**\n{msg}", file=file, ephemeral=True)
+
+    else:
+        if not channel:
+            await interaction.response.send_message("Salon requis pour le setup.", ephemeral=True)
+            return
+        settings[gid]["goodbye_channel"] = channel.id
+        settings[gid]["goodbye_message"] = message
+        settings[gid]["goodbye_image"] = image == "on"
+        save_settings(settings)
+        file = await generate_goodbye_image(interaction.user)
+        preview_msg = message.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
+        await interaction.response.send_message(
+            f"Départ configuré dans {channel.mention}.\n"
+            f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`\n\n"
+            f"**Aperçu :**\n{preview_msg}",
+            file=file
+        )
 
 
-@bot.tree.command(name="goodbye-preview", description="Aperçu du message de départ")
-@app_commands.checks.has_permissions(administrator=True)
-async def goodbye_preview(interaction: discord.Interaction):
-    settings = load_settings()
-    gid = str(interaction.guild.id)
-    s = settings.get(gid, {})
-    msg = s.get("goodbye_message", "**{user}** a quitté **{server}**.")
-    msg = msg.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
-    file = await generate_goodbye_image(interaction.user)
-    await interaction.response.send_message(f"**Aperçu :**\n{msg}", file=file, ephemeral=True)
-
-
-@bot.tree.command(name="boost", description="Configure le message de boost avec image Canvas")
+@welcome.command(name="boost", description="Configure le boost (setup/disable/preview)")
 @app_commands.describe(
-    channel="Salon de boost",
+    action="Action",
+    channel="Salon de boost (setup uniquement)",
     message="Message (variables : {user}, {server}, {boosts})",
-    image="Afficher l'image Canvas (on/off)"
+    image="Image Canvas (on/off)"
 )
-@app_commands.choices(image=[
+@app_commands.choices(action=[
+    app_commands.Choice(name="setup", value="setup"),
+    app_commands.Choice(name="disable", value="disable"),
+    app_commands.Choice(name="preview", value="preview"),
+], image=[
     app_commands.Choice(name="on", value="on"),
     app_commands.Choice(name="off", value="off"),
 ])
 @app_commands.checks.has_permissions(administrator=True)
-async def boost(interaction: discord.Interaction, channel: discord.TextChannel, message: str = "**{user}** a boosté **{server}** !", image: str = "on"):
+async def boost(interaction: discord.Interaction, action: str, channel: discord.TextChannel = None, message: str = "**{user}** a boosté **{server}** !", image: str = "on"):
     settings = load_settings()
     gid = str(interaction.guild.id)
     if gid not in settings:
         settings[gid] = {}
-    settings[gid]["boost_channel"] = channel.id
-    settings[gid]["boost_message"] = message
-    settings[gid]["boost_image"] = image == "on"
-    save_settings(settings)
 
-    file = await generate_boost_image(interaction.user)
-    boost_count = interaction.guild.premium_subscription_count or 0
-    preview_msg = message.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{boosts}", str(boost_count))
-    await interaction.response.send_message(
-        f"Configuration de boost enregistrée dans {channel.mention}.\n"
-        f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`\n\n"
-        f"**Aperçu :**\n{preview_msg}",
-        file=file
-    )
-
-
-@bot.tree.command(name="boost-disable", description="Désactive le message de boost")
-@app_commands.checks.has_permissions(administrator=True)
-async def boost_disable(interaction: discord.Interaction):
-    settings = load_settings()
-    gid = str(interaction.guild.id)
-    if gid in settings:
+    if action == "disable":
         settings[gid].pop("boost_channel", None)
         settings[gid].pop("boost_message", None)
         settings[gid].pop("boost_image", None)
         save_settings(settings)
-    await interaction.response.send_message("Message de boost désactivé.")
+        await interaction.response.send_message("Message de boost désactivé.")
 
+    elif action == "preview":
+        s = settings.get(gid, {})
+        msg = s.get("boost_message", "**{user}** a boosté **{server}** !")
+        boost_count = interaction.guild.premium_subscription_count or 0
+        msg = msg.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{boosts}", str(boost_count))
+        file = await generate_boost_image(interaction.user)
+        await interaction.response.send_message(f"**Aperçu :**\n{msg}", file=file, ephemeral=True)
 
-@bot.tree.command(name="boost-preview", description="Aperçu du message de boost")
-@app_commands.checks.has_permissions(administrator=True)
-async def boost_preview(interaction: discord.Interaction):
-    settings = load_settings()
-    gid = str(interaction.guild.id)
-    s = settings.get(gid, {})
-    msg = s.get("boost_message", "**{user}** a boosté **{server}** !")
-    boost_count = interaction.guild.premium_subscription_count or 0
-    msg = msg.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{boosts}", str(boost_count))
-    file = await generate_boost_image(interaction.user)
-    await interaction.response.send_message(f"**Aperçu :**\n{msg}", file=file, ephemeral=True)
+    else:
+        if not channel:
+            await interaction.response.send_message("Salon requis pour le setup.", ephemeral=True)
+            return
+        settings[gid]["boost_channel"] = channel.id
+        settings[gid]["boost_message"] = message
+        settings[gid]["boost_image"] = image == "on"
+        save_settings(settings)
+        file = await generate_boost_image(interaction.user)
+        boost_count = interaction.guild.premium_subscription_count or 0
+        preview_msg = message.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{boosts}", str(boost_count))
+        await interaction.response.send_message(
+            f"Boost configuré dans {channel.mention}.\n"
+            f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`\n\n"
+            f"**Aperçu :**\n{preview_msg}",
+            file=file
+        )
 
 
 # ──────────────────────────────────────────────
@@ -2931,7 +2926,7 @@ LINK_REGEX = r"https?://\S+|www\.\S+"
 user_message_cache = defaultdict(list)
 
 
-@bot.tree.command(name="automod", description="Gère l'automod du bot")
+@config.command(name="automod", description="Gère l'automod du bot")
 @app_commands.describe(option="anti-link ou anti-spam", state="on ou off")
 @app_commands.choices(option=[
     app_commands.Choice(name="anti-link", value="anti-link"),
@@ -2953,7 +2948,7 @@ async def automod(interaction: discord.Interaction, option: str, state: str):
     await interaction.response.send_message(f"`{option}` {status}.")
 
 
-@bot.tree.command(name="mod-log", description="Configure le salon de logs de modération")
+@mod.command(name="mod-log", description="Configure le salon de logs de modération")
 @app_commands.describe(channel="Le salon de logs")
 @app_commands.checks.has_permissions(administrator=True)
 async def mod_log_cmd(interaction: discord.Interaction, channel: discord.TextChannel):
@@ -2973,7 +2968,7 @@ async def mod_log_cmd(interaction: discord.Interaction, channel: discord.TextCha
 afk_users = {}
 
 
-@bot.tree.command(name="afk", description="Passe en mode AFK")
+@util.command(name="afk", description="Passe en mode AFK")
 @app_commands.describe(reason="Raison de l'AFK")
 async def afk(interaction: discord.Interaction, reason: str = "AFK"):
     afk_users[interaction.user.id] = {
@@ -2983,7 +2978,7 @@ async def afk(interaction: discord.Interaction, reason: str = "AFK"):
     await interaction.response.send_message(f"**{interaction.user.display_name}** est maintenant AFK : {reason}")
 
 
-@bot.tree.command(name="remind", description="Définit un rappel automatique")
+@util.command(name="remind", description="Définit un rappel automatique")
 @app_commands.describe(duration="Durée (ex: 1h30m, 30m, 2d)", message="Message du rappel")
 async def remind(interaction: discord.Interaction, duration: str, message: str):
     total = 0
@@ -3020,7 +3015,7 @@ async def remind(interaction: discord.Interaction, duration: str, message: str):
         pass
 
 
-@bot.tree.command(name="uptime", description="Affiche le temps de fonctionnement du bot")
+@util.command(name="uptime", description="Affiche le temps de fonctionnement du bot")
 async def uptime(interaction: discord.Interaction):
     delta = datetime.now(timezone.utc) - bot.user.created_at
     hours, remainder = divmod(int(delta.total_seconds()), 3600)
@@ -3030,7 +3025,7 @@ async def uptime(interaction: discord.Interaction):
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="bot-info", description="Affiche les informations du bot")
+@util.command(name="bot-info", description="Affiche les informations du bot")
 async def bot_info(interaction: discord.Interaction):
     latency = round(bot.latency * 1000)
     uptime_sec = (datetime.now(timezone.utc) - bot.user.created_at).total_seconds()
@@ -3057,13 +3052,13 @@ async def bot_info(interaction: discord.Interaction):
 #  FUN
 # ──────────────────────────────────────────────
 
-@bot.tree.command(name="coinflip", description="Lance une pièce (pile ou face)")
+@fun.command(name="coinflip", description="Lance une pièce (pile ou face)")
 async def coinflip(interaction: discord.Interaction):
     result = random.choice(["Pile", "Face"])
     await interaction.response.send_message(f"🪙 **{result}**")
 
 
-@bot.tree.command(name="dice", description="Lance un dé")
+@fun.command(name="dice", description="Lance un dé")
 @app_commands.describe(faces="Nombre de faces (défaut : 6)")
 async def dice(interaction: discord.Interaction, faces: int = 6):
     if faces < 2:
@@ -3073,7 +3068,7 @@ async def dice(interaction: discord.Interaction, faces: int = 6):
     await interaction.response.send_message(f"🎲 **{result}** / {faces}")
 
 
-@bot.tree.command(name="8ball", description="Boule magique — posez une question")
+@fun.command(name="8ball", description="Boule magique — posez une question")
 @app_commands.describe(question="Votre question")
 async def eight_ball(interaction: discord.Interaction, question: str):
     answers = [
@@ -3087,7 +3082,7 @@ async def eight_ball(interaction: discord.Interaction, question: str):
     await interaction.response.send_message(f"🔮 **{random.choice(answers)}**")
 
 
-@bot.tree.command(name="ship", description="Teste la compatibilité entre deux membres")
+@fun.command(name="ship", description="Teste la compatibilité entre deux membres")
 @app_commands.describe(user1="Premier membre", user2="Deuxième membre")
 async def ship(interaction: discord.Interaction, user1: discord.Member, user2: discord.Member):
     seed = f"{user1.id}{user2.id}"
@@ -3124,7 +3119,7 @@ async def ship(interaction: discord.Interaction, user1: discord.Member, user2: d
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="rate", description="Note quelque chose sur 10")
+@fun.command(name="rate", description="Note quelque chose sur 10")
 @app_commands.describe(chose="Ce que vous voulez noter")
 async def rate(interaction: discord.Interaction, chose: str):
     score = random.randint(0, 10)
@@ -3137,86 +3132,6 @@ async def rate(interaction: discord.Interaction, chose: str):
 # ──────────────────────────────────────────────
 #  GESTION DE SALON
 # ──────────────────────────────────────────────
-
-@bot.tree.command(name="clone", description="Duplique le salon actuel")
-@app_commands.describe(name="Nom du nouveau salon (optionnel)")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def clone(interaction: discord.Interaction, name: str = None):
-    channel = interaction.channel
-    new_name = name or channel.name
-    new_channel = await channel.clone(name=new_name)
-    await new_channel.edit(position=channel.position + 1)
-    await interaction.response.send_message(f"Salon dupliqué : {new_channel.mention}")
-
-
-@bot.tree.command(name="hide", description="Cache le salon (plus visible pour @everyone)")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def hide(interaction: discord.Interaction):
-    await interaction.channel.set_permissions(
-        interaction.guild.default_role,
-        view_channel=False
-    )
-    await interaction.response.send_message("Salon caché.")
-
-
-@bot.tree.command(name="unhide", description="Rend le salon visible")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def unhide(interaction: discord.Interaction):
-    await interaction.channel.set_permissions(
-        interaction.guild.default_role,
-        view_channel=None
-    )
-    await interaction.response.send_message("Salon visible.")
-
-
-@bot.tree.command(name="archive", description="Archive le salon en transcript")
-@app_commands.checks.has_permissions(administrator=True)
-async def archive(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-
-    messages = []
-    async for message in interaction.channel.history(limit=1000, oldest_first=True):
-        if message.author.bot:
-            continue
-        messages.append(f"[{message.created_at.strftime('%d/%m/%Y %H:%M')}] {message.author.display_name}: {message.content}")
-
-    transcript = "\n".join(messages) if messages else "Aucun message."
-    file = discord.File(
-        fp=__import__('io').BytesIO(transcript.encode()),
-        filename=f"archive-{interaction.channel.name}.txt"
-    )
-    await interaction.followup.send("Archive générée.", file=file, ephemeral=True)
-
-    new_channel = await interaction.channel.clone(name=f"archive-{interaction.channel.name}")
-    await new_channel.edit(position=interaction.channel.position)
-    await interaction.channel.delete()
-
-
-@bot.tree.command(name="lock-all", description="Verrouille tous les salons texte")
-@app_commands.checks.has_permissions(administrator=True)
-async def lock_all(interaction: discord.Interaction):
-    count = 0
-    for ch in interaction.guild.text_channels:
-        try:
-            await ch.set_permissions(interaction.guild.default_role, send_messages=False)
-            count += 1
-        except discord.Forbidden:
-            pass
-    await interaction.response.send_message(f"`{count}` salons verrouillés.")
-
-
-@bot.tree.command(name="unlock-all", description="Déverrouille tous les salons texte")
-@app_commands.checks.has_permissions(administrator=True)
-async def unlock_all(interaction: discord.Interaction):
-    count = 0
-    for ch in interaction.guild.text_channels:
-        try:
-            await ch.set_permissions(interaction.guild.default_role, send_messages=None)
-            count += 1
-        except discord.Forbidden:
-            pass
-    await interaction.response.send_message(f"`{count}` salons déverrouillés.")
-
 
 # ──────────────────────────────────────────────
 #  ANTI-RAID AVANCÉ
@@ -3312,7 +3227,7 @@ async def handle_raid_member(member, config, reason):
             f"**Erreur** Permissions insuffisantes"
         ])
 
-@bot.tree.command(name="anti-raid", description="Configure l'anti-raid avancé")
+@raid.command(name="config", description="Configure l'anti-raid avancé")
 @app_commands.describe(
     state="on ou off",
     max_joins="Max joins dans la fenêtre (défaut: 5)",
@@ -3357,7 +3272,7 @@ async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int
     await interaction.response.send_message(view=view)
 
 
-@bot.tree.command(name="raid-log", description="Configure le salon de logs anti-raid")
+@raid.command(name="log", description="Configure le salon de logs anti-raid")
 @app_commands.describe(channel="Le salon de logs")
 @app_commands.checks.has_permissions(administrator=True)
 async def raid_log(interaction: discord.Interaction, channel: discord.TextChannel):
@@ -3366,7 +3281,7 @@ async def raid_log(interaction: discord.Interaction, channel: discord.TextChanne
     await interaction.response.send_message(f"Logs anti-raid configurés dans {channel.mention}.")
 
 
-@bot.tree.command(name="raid-whitelist", description="Ajoute ou retire un rôle de la whitelist anti-raid")
+@raid.command(name="whitelist", description="Ajoute ou retire un rôle de la whitelist anti-raid")
 @app_commands.describe(role="Le rôle à gérer")
 @app_commands.choices(action=[
     app_commands.Choice(name="ajouter", value="add"),
@@ -3393,7 +3308,7 @@ async def raid_whitelist(interaction: discord.Interaction, role: discord.Role, a
             await interaction.response.send_message(f"{role.mention} n'est pas dans la whitelist.", ephemeral=True)
 
 
-@bot.tree.command(name="raid-status", description="Affiche la configuration anti-raid")
+@raid.command(name="status", description="Affiche la configuration anti-raid")
 @app_commands.checks.has_permissions(administrator=True)
 async def raid_status(interaction: discord.Interaction):
     gid = str(interaction.guild.id)
@@ -3631,6 +3546,153 @@ async def on_member_update(before: discord.Member, after: discord.Member):
 
 
 # ──────────────────────────────────────────────
+#  MUSIC SYSTEM
+# ──────────────────────────────────────────────
+
+import subprocess
+import shutil
+
+music_queues = {}
+music_players = {}
+
+
+class MusicPlayer:
+    def __init__(self, guild_id):
+        self.guild_id = guild_id
+        self.queue = []
+        self.current = None
+        self.voice_client = None
+        self.channel = None
+        self.volume = 0.5
+        self.paused = False
+
+    def next(self):
+        if self.queue:
+            self.current = self.queue.pop(0)
+            return self.current
+        self.current = None
+        return None
+
+
+async def search_ytdlp(query):
+    cmd = [
+        "yt-dlp",
+        "--no-download",
+        "--print", "%(id)s|||%(title)s|||%(duration)s|||%(url)s",
+        f"ytsearch1:{query}"
+    ]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+        line = stdout.decode().strip()
+        if line:
+            parts = line.split("|||")
+            if len(parts) >= 3:
+                return {
+                    "id": parts[0],
+                    "title": parts[1],
+                    "duration": parts[2],
+                    "url": parts[3] if len(parts) > 3 else f"https://www.youtube.com/watch?v={parts[0]}"
+                }
+    except (asyncio.TimeoutError, Exception):
+        pass
+    return None
+
+
+async def get_audio_url(url):
+    cmd = [
+        "yt-dlp",
+        "-f", "bestaudio/best",
+        "-g",
+        "--no-playlist",
+        url
+    ]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
+        audio_url = stdout.decode().strip().split("\n")[0]
+        return audio_url
+    except (asyncio.TimeoutError, Exception):
+        return None
+
+
+def format_duration(seconds):
+    try:
+        s = int(seconds)
+    except (ValueError, TypeError):
+        return "??:??"
+    m, sec = divmod(s, 60)
+    h, m = divmod(m, 60)
+    if h > 0:
+        return f"{h}:{m:02d}:{sec:02d}"
+    return f"{m}:{sec:02d}"
+
+
+async def play_next(guild_id):
+    player = music_players.get(guild_id)
+    if not player or not player.voice_client or not player.voice_client.is_connected():
+        return
+
+    track = player.next()
+    if not track:
+        try:
+            await player.voice_client.disconnect()
+        except Exception:
+            pass
+        music_players.pop(guild_id, None)
+        return
+
+    try:
+        audio_url = await get_audio_url(track["url"])
+        if not audio_url:
+            return await play_next(guild_id)
+
+        FFMPEG_OPTIONS = {
+            "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+            "options": f"-vn -filter:a \"volume={player.volume}\""
+        }
+
+        source = discord.FFmpegOpusAudio(audio_url, **FFMPEG_OPTIONS)
+
+        def after_playing(error):
+            if error:
+                print(f"Music error: {error}")
+            coro = play_next(guild_id)
+            asyncio.run_coroutine_threadsafe(coro, bot.loop)
+
+        player.voice_client.play(source, after=after_playing)
+
+        if player.channel:
+            view = discord.ui.LayoutView()
+            container = discord.ui.Container(accent_colour=17619185)
+            section = discord.ui.Section(
+                accessory=discord.ui.Thumbnail(media=f"https://img.youtube.com/vi/{track['id']}/maxresdefault.jpg", description=track["title"])
+            )
+            section.add_item(discord.ui.TextDisplay(
+                f"## 🎵 Lecture en cours\n"
+                f"**{track['title']}**\n"
+                f"**Durée** `{format_duration(track['duration'])}`\n"
+                f"**File** `{len(player.queue)}` en attente"
+            ))
+            container.add_item(section)
+            view.add_item(container)
+            await player.channel.send(view=view)
+    except Exception as e:
+        print(f"Play error: {e}")
+        await play_next(guild_id)
+
+
+
+
+# ──────────────────────────────────────────────
 #  AI PERSONNALITÉ — Réponses insolentes
 # ──────────────────────────────────────────────
 
@@ -3775,7 +3837,7 @@ def get_ai_response(intent):
     return random.choice(pool.get(intent, AI_RANDOM))
 
 
-@bot.tree.command(name="ai", description="Active ou désactive l'IA insolente du bot")
+@ai.command(name="toggle", description="Active ou désactive l'IA insolente du bot")
 @app_commands.describe(state="on ou off")
 @app_commands.choices(state=[
     app_commands.Choice(name="on", value="on"),
@@ -3793,5 +3855,151 @@ async def ai_toggle(interaction: discord.Interaction, state: str):
     emoji = "🤖" if state == "on" else "😴"
     await interaction.response.send_message(f"{emoji} IA insolente {status}.")
 
+# ──────────────────────────────────────────────
+#  PANELS DE CONFIGURATION INTERACTIFS
+# ──────────────────────────────────────────────
+
+# --- WELCOME PANEL ---
+class WelcomePanel(discord.ui.LayoutView):
+    def __init__(self, settings, gid, guild):
+        super().__init__(timeout=120)
+        self.settings = settings
+        self.gid = gid
+        s = settings.get(gid, {})
+        ch = guild.get_channel(s.get("welcome_channel")) if s.get("welcome_channel") else None
+        ch_text = ch.mention if ch else "Non configuré"
+        msg = s.get("welcome_message", "Bienvenue {user} sur **{server}** !")
+        img = "Activée" if s.get("welcome_image", True) else "Désactivée"
+
+        container = discord.ui.Container(accent_colour=17619185)
+        container.add_item(discord.ui.TextDisplay("## ⚙️ Panel Welcome"))
+        container.add_item(discord.ui.TextDisplay(f"**Salon :** {ch_text}\n**Image :** {img}\n**Message :** `{msg}`"))
+        row = discord.ui.ActionRow()
+        row.add_item(discord.ui.Button(label="Salon", style=discord.ButtonStyle.primary, custom_id="wp_channel"))
+        row.add_item(discord.ui.Button(label="Message", style=discord.ButtonStyle.secondary, custom_id="wp_message"))
+        row.add_item(discord.ui.Button(label="Image on/off", style=discord.ButtonStyle.success, custom_id="wp_image"))
+        row.add_item(discord.ui.Button(label="Aperçu", style=discord.ButtonStyle.link, custom_id="wp_preview"))
+        row.add_item(discord.ui.Button(label="Désactiver", style=discord.ButtonStyle.danger, custom_id="wp_disable"))
+        container.add_item(row)
+        self.add_item(container)
+
+
+@welcome.command(name="panel", description="Panel de configuration de l'accueil")
+@app_commands.checks.has_permissions(administrator=True)
+async def welcome_panel(interaction: discord.Interaction):
+    settings = load_settings()
+    gid = str(interaction.guild.id)
+    view = WelcomePanel(settings, gid, interaction.guild)
+    await interaction.response.send_message(view=view, ephemeral=True)
+
+
+# --- GOODBYE PANEL ---
+@welcome.command(name="goodbye-panel", description="Panel de configuration du départ")
+@app_commands.checks.has_permissions(administrator=True)
+async def goodbye_panel(interaction: discord.Interaction):
+    settings = load_settings()
+    gid = str(interaction.guild.id)
+    s = settings.get(gid, {})
+    ch = interaction.guild.get_channel(s.get("goodbye_channel")) if s.get("goodbye_channel") else None
+    ch_text = ch.mention if ch else "Non configuré"
+    msg = s.get("goodbye_message", "**{user}** a quitté **{server}**.")
+    img = "Activée" if s.get("goodbye_image", True) else "Désactivée"
+
+    view = discord.ui.LayoutView(timeout=120)
+    container = discord.ui.Container(accent_colour=17619185)
+    container.add_item(discord.ui.TextDisplay("## ⚙️ Panel Goodbye"))
+    container.add_item(discord.ui.TextDisplay(f"**Salon :** {ch_text}\n**Image :** {img}\n**Message :** `{msg}`"))
+    row = discord.ui.ActionRow()
+    row.add_item(discord.ui.Button(label="Salon", style=discord.ButtonStyle.primary, custom_id="gp_channel"))
+    row.add_item(discord.ui.Button(label="Message", style=discord.ButtonStyle.secondary, custom_id="gp_message"))
+    row.add_item(discord.ui.Button(label="Image on/off", style=discord.ButtonStyle.success, custom_id="gp_image"))
+    row.add_item(discord.ui.Button(label="Désactiver", style=discord.ButtonStyle.danger, custom_id="gp_disable"))
+    container.add_item(row)
+    view.add_item(container)
+    await interaction.response.send_message(view=view, ephemeral=True)
+
+
+# --- BOOST PANEL ---
+@welcome.command(name="boost-panel", description="Panel de configuration des boosts")
+@app_commands.checks.has_permissions(administrator=True)
+async def boost_panel(interaction: discord.Interaction):
+    settings = load_settings()
+    gid = str(interaction.guild.id)
+    s = settings.get(gid, {})
+    ch = interaction.guild.get_channel(s.get("boost_channel")) if s.get("boost_channel") else None
+    ch_text = ch.mention if ch else "Non configuré"
+    msg = s.get("boost_message", "**{user}** a boosté **{server}** !")
+    img = "Activée" if s.get("boost_image", True) else "Désactivée"
+
+    view = discord.ui.LayoutView(timeout=120)
+    container = discord.ui.Container(accent_colour=17619185)
+    container.add_item(discord.ui.TextDisplay("## ⚙️ Panel Boost"))
+    container.add_item(discord.ui.TextDisplay(f"**Salon :** {ch_text}\n**Image :** {img}\n**Message :** `{msg}`"))
+    row = discord.ui.ActionRow()
+    row.add_item(discord.ui.Button(label="Salon", style=discord.ButtonStyle.primary, custom_id="bp_channel"))
+    row.add_item(discord.ui.Button(label="Message", style=discord.ButtonStyle.secondary, custom_id="bp_message"))
+    row.add_item(discord.ui.Button(label="Image on/off", style=discord.ButtonStyle.success, custom_id="bp_image"))
+    row.add_item(discord.ui.Button(label="Désactiver", style=discord.ButtonStyle.danger, custom_id="bp_disable"))
+    container.add_item(row)
+    view.add_item(container)
+    await interaction.response.send_message(view=view, ephemeral=True)
+
+
+# --- MOD PANEL ---
+@config.command(name="mod-panel", description="Panel de modération rapide")
+@app_commands.checks.has_permissions(administrator=True)
+async def mod_panel(interaction: discord.Interaction):
+    settings = load_settings()
+    gid = str(interaction.guild.id)
+    s = settings.get(gid, {})
+    automod = "ON" if s.get("automod_enabled") else "OFF"
+    log_ch = interaction.guild.get_channel(s.get("mod_log_channel")) if s.get("mod_log_channel") else None
+    log_text = log_ch.mention if log_ch else "Non configuré"
+
+    view = discord.ui.LayoutView(timeout=120)
+    container = discord.ui.Container(accent_colour=17619185)
+    container.add_item(discord.ui.TextDisplay("## 🛡️ Panel Modération"))
+    container.add_item(discord.ui.TextDisplay(f"**Automod :** {automod}\n**Logs :** {log_text}"))
+    row = discord.ui.ActionRow()
+    row.add_item(discord.ui.Button(label="Automod on/off", style=discord.ButtonStyle.primary, custom_id="mp_automod"))
+    row.add_item(discord.ui.Button(label="Salon logs", style=discord.ButtonStyle.secondary, custom_id="mp_log"))
+    container.add_item(row)
+    row2 = discord.ui.ActionRow()
+    row2.add_item(discord.ui.Button(label="Purge 100", style=discord.ButtonStyle.danger, custom_id="mp_purge"))
+    container.add_item(row2)
+    view.add_item(container)
+    await interaction.response.send_message(view=view, ephemeral=True)
+
+
+# --- AI PANEL ---
+@ai.command(name="panel", description="Panel de configuration de l'IA")
+@app_commands.checks.has_permissions(administrator=True)
+async def ai_panel(interaction: discord.Interaction):
+    settings = load_settings()
+    gid = str(interaction.guild.id)
+    s = settings.get(gid, {})
+    ai = "ON" if s.get("ai_enabled") else "OFF"
+
+    view = discord.ui.LayoutView(timeout=120)
+    container = discord.ui.Container(accent_colour=17619185)
+    container.add_item(discord.ui.TextDisplay("## 🤖 Panel IA Insolente"))
+    container.add_item(discord.ui.TextDisplay(f"**État :** {ai}"))
+    row = discord.ui.ActionRow()
+    row.add_item(discord.ui.Button(label="Activer", style=discord.ButtonStyle.success, custom_id="ai_on"))
+    row.add_item(discord.ui.Button(label="Désactiver", style=discord.ButtonStyle.danger, custom_id="ai_off"))
+    container.add_item(row)
+    view.add_item(container)
+    await interaction.response.send_message(view=view, ephemeral=True)
+
+
+# ──────────────────────────────────────────────
+#  PANELS — HANDLER (components + modals)
+# ──────────────────────────────────────────────
+# Tout est géré dans le premier on_interaction au-dessus.
+# Les handlers ci-dessous ont été fusionnés dans celui du ticket/help.
+
+# ─── ENREGISTREMENT DES GROUPES ───
+for g in [mod, config, welcome, ticket, music, util, fun, backup, stats, raid, ghostping, ai]:
+    bot.tree.add_command(g)
 
 bot.run(TOKEN)

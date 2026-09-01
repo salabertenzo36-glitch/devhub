@@ -1,2 +1,3 @@
-TOKEN = "MTU0NDA3NzY2NjQ3MzM1MzI1Ng.GhcAP3.2n9F5Xxd1_Vc9efEUR_pTnFRePX7wKkNV4Mj9E"
+import os
+TOKEN = os.environ.get("DISCORD_TOKEN", "")
 GUILD_ID = 0
