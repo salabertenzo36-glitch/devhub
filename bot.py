@@ -1494,12 +1494,17 @@ def make_help_view(category_key):
 
     options = []
     for key, val in HELP_CATEGORIES.items():
-        emoji_id = int(val["emoji"].split(":")[-1].rstrip(">"))
+        emoji_str = val["emoji"]
+        if emoji_str.startswith("<:"):
+            emoji_id = int(emoji_str.split(":")[-1].rstrip(">"))
+            emoji_obj = discord.PartialEmoji(name=emoji_str.split(":")[1], id=emoji_id)
+        else:
+            emoji_obj = emoji_str
         options.append(discord.SelectOption(
             label=val["label"],
             value=key,
             description=f"{len(val['commands'])} commandes",
-            emoji=discord.PartialEmoji(name=val["emoji"].split(":")[1], id=emoji_id)
+            emoji=emoji_obj
         ))
 
     row = discord.ui.ActionRow()
