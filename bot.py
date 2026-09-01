@@ -3427,8 +3427,10 @@ async def on_message(message: discord.Message):
         content = message.content.replace(f"<@{bot.user.id}>", "").replace(f"<@!{bot.user.id}>", "").strip()
         if not content:
             return
-        intent = detect_ai_intent(content.lower())
-        response = get_ai_response(intent)
+        async with message.channel.typing():
+            response = await get_ai_response(content, message.author.display_name)
+        if len(response) > 2000:
+            response = response[:2000]
         await message.channel.send(response)
 
 
@@ -3814,40 +3816,21 @@ AI_RANDOM = [
     "Oh wow, t'es original. Non attends, pas du tout.",
 ]
 
-def detect_ai_intent(message_lower):
-    greetings = ["salut", "hello", "bonjour", "coucou", "yo", "hey", "wesh", "bonsoir", "slt"]
-    thanks = ["merci", "thanks", "thx", "ty", "gp", "bien joué"]
-    bye = ["au revoir", "bye", "ciao", "a+", "tchao", "adieu", "c'est bon", "je pars"]
-    love = ["je t'aime", "t'es cool", "t'es beau", "t'es bien", "best bot", "t'es le meilleur"]
-    help_cmd = ["aide", "help", "comment", "how", "commande", "command"]
-    insults = ["ferme", "tais", "nul", "idiot", "stupide", "dégage", "rentre chez toi", "tg", "mal", "bête", "con", "suce"]
-
-    if any(w in message_lower for w in greetings):
-        return "greeting"
-    if any(w in message_lower for w in thanks):
-        return "thanks"
-    if any(w in message_lower for w in bye):
-        return "bye"
-    if any(w in message_lower for w in love):
-        return "love"
-    if any(w in message_lower for w in help_cmd):
-        return "help"
-    if any(w in message_lower for w in insults):
-        return "insult"
-    return "random"
-
-
-def get_ai_response(intent):
-    pool = {
-        "greeting": AI_GREETINGS,
-        "thanks": AI_THANKS,
-        "bye": AI_BYE,
-        "love": AI_LOVE,
-        "help": AI_HELP,
-        "insult": AI_INSULT_RESPONSES,
-        "random": AI_RANDOM,
-    }
-    return random.choice(pool.get(intent, AI_RANDOM))
+async def get_ai_response(message_content, user_name):
+    try:
+        from duckduckgo_search import DDGS
+        with DDGS() as ddgs:
+            results = list(ddgs.chat(
+                message_content,
+                model="gpt-4o-mini"
+            ))
+            if results:
+                response = results[-1].get("answer", "")
+                if response:
+                    return response
+    except Exception as e:
+        print(f"AI error: {e}")
+    return "Je sais pas quoi dire là."
 
 
 @ai.command(name="toggle", description="Active ou désactive l'IA insolente du bot")
