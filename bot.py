@@ -1340,7 +1340,7 @@ async def poll(interaction: discord.Interaction, question: str, option1: str, op
 HELP_CATEGORIES = {
     "mod": {
         "label": "Modération",
-        "emoji": "<:moderation:1544361396295176235>",
+        "emoji": "<:moderation:1544362972443443260>",
         "commands": [
             "`/mod warn` — Avertir un membre",
             "`/mod warnings` — Affiche les warns",
@@ -1362,7 +1362,7 @@ HELP_CATEGORIES = {
     },
     "config": {
         "label": "Configuration",
-        "emoji": "<:mod_avancee:1544361392142811166>",
+        "emoji": "<:mod_avancee:1544362968433696900>",
         "commands": [
             "`/config staff-roles` — Roles staff",
             "`/config ticket-channel` — Canal de tickets",
@@ -1447,7 +1447,7 @@ HELP_CATEGORIES = {
     },
     "fun": {
         "label": "Fun",
-        "emoji": "<:fun:1544361379450982465>",
+        "emoji": "<:fun:1544362956723060817>",
         "commands": [
             "`/fun coinflip` — Pile ou face",
             "`/fun dice` — Lancer de dé",
@@ -1476,7 +1476,7 @@ HELP_CATEGORIES = {
     },
     "raid": {
         "label": "Anti-raid",
-        "emoji": "<:automod:1544361362757521490>",
+        "emoji": "<:automod:1544362922640154708>",
         "commands": [
             "`/raid config` — Configurer l'anti-raid intelligent",
             "`/raid log` — Salon de logs",
@@ -1491,7 +1491,7 @@ HELP_CATEGORIES = {
     },
     "ghostping": {
         "label": "Ghostping",
-        "emoji": "<:ghostping:1544361383557337140>",
+        "emoji": "<:ghostping:1544362960317849662>",
         "commands": [
             "`/ghostping send` — Ghostping un salon",
         ]
