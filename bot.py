@@ -3417,6 +3417,20 @@ async def on_message(message: discord.Message):
 
     await bot.process_commands(message)
 
+    if not message.guild:
+        return
+    gid = str(message.guild.id)
+    settings2 = load_settings()
+    if not settings2.get(gid, {}).get("ai_enabled"):
+        return
+    if bot.user in message.mentions:
+        content = message.content.replace(f"<@{bot.user.id}>", "").replace(f"<@!{bot.user.id}>", "").strip()
+        if not content:
+            return
+        intent = detect_ai_intent(content.lower())
+        response = get_ai_response(intent)
+        await message.channel.send(response)
+
 
 @bot.event
 async def on_member_remove(member: discord.Member):
@@ -3706,7 +3720,7 @@ AI_INSULTS = [
     "Broski, t'as vraiment rien de mieux à faire ?",
     "Va falloir faire mieux que ça pour m'impressionner.",
     "J'ai plus de patience que ton cerveau de neurones.",
-    "T'es le genre de gars qui Google \"comment respirer\".",
+    "T'es le genre de gars qui Google comment respirer.",
     "Allez, next. T'es pas intéressant.",
     "C'est pas une mention, c'est un cry for help ?",
     "Si tu crois que je vais répondre gentiment, t'as raté ta vie.",
@@ -3725,7 +3739,6 @@ AI_INSULTS = [
     "Si t'es un bot aussi, t'es en mode dégradé.",
     "Va poster sur LinkedIn avec tes take chaudes.",
     "Je suis un bot de qualité, pas un assistant Google.",
-    "Faut vraiment que tu apprennes à lire les空气.",
     "Tu l'as mérité.",
     "T'es au moins cohérent dans ta nullité.",
     "Mon timeout pour toi c'est permanent.",
