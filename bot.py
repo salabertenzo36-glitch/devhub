@@ -425,6 +425,32 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.defer()
         return
 
+    if custom_id == "reglement_accept":
+        gid = str(interaction.guild.id)
+        settings = load_settings()
+        s = settings.get(gid, {})
+        role_id = s.get("reglement_role")
+        if not role_id:
+            await interaction.response.send_message("Le systeme de reglement n'est pas configure.", ephemeral=True)
+            return
+        role = interaction.guild.get_role(int(role_id))
+        if not role:
+            await interaction.response.send_message("Le role de reglement est introuvable.", ephemeral=True)
+            return
+        member = interaction.guild.get_member(interaction.user.id)
+        if not member:
+            await interaction.response.send_message("Membre introuvable.", ephemeral=True)
+            return
+        if role in member.roles:
+            await interaction.response.send_message("Tu as deja accepte le reglement.", ephemeral=True)
+            return
+        try:
+            await member.add_roles(role, reason="Reglement accepte")
+            await interaction.response.send_message(f"Reglement accepte ! Le role {role.mention} t'a ete attribue.", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message("Impossible d'assigner le role (permissions manquantes).", ephemeral=True)
+        return
+
     if custom_id in ("ticket_select_persistent", "ticket_setup_select", "ticket_select", "ticket_panel_select"):
         value = interaction.data.get("values", [None])[0]
         if value:
@@ -1338,11 +1364,13 @@ HELP_CATEGORIES = {
         "label": "Configuration",
         "emoji": "<:mod_avancee:1543707521401884843>",
         "commands": [
-            "`/config staff-roles` — Rôles staff",
+            "`/config staff-roles` — Roles staff",
             "`/config ticket-channel` — Canal de tickets",
             "`/config automod` — Anti-link / Anti-spam",
-            "`/config autorole` — Rôle automatique",
-            "`/config mod-panel` — Panel modération",
+            "`/config autorole` — Role automatique",
+            "`/config mod-panel` — Panel moderation",
+            "`/config reglement` — Configurer le reglement",
+            "`/config reglement-post` — Poster le panel reglement",
         ]
     },
     "welcome": {
@@ -4134,7 +4162,7 @@ AI_RANDOM = [
 async def get_ai_response(message_content, user_name):
     try:
         import g4f
-        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: toggle, panel\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-spam, anti-link, verification gate, lockdown.\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
+        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: toggle, panel\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-spam, anti-link, verification gate, lockdown.\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
         response = g4f.ChatCompletion.create(
             model=g4f.models.gpt_4,
             messages=[
@@ -4282,6 +4310,69 @@ async def mod_panel(interaction: discord.Interaction):
     container.add_item(row2)
     view.add_item(container)
     await interaction.response.send_message(view=view, ephemeral=True)
+
+
+# --- REGLEMENT ---
+@config.command(name="reglement", description="Configurer le systeme de reglement")
+@app_commands.describe(
+    channel="Canal du reglement",
+    role="Role a assigner apres acceptation",
+    text="Texte du reglement (separe par | pour les lignes)"
+)
+@app_commands.checks.has_permissions(administrator=True)
+async def reglement_config(interaction: discord.Interaction, channel: discord.TextChannel, role: discord.Role, text: str = ""):
+    gid = str(interaction.guild.id)
+    save_settings_field(gid, {
+        "reglement_channel": channel.id,
+        "reglement_role": role.id,
+        "reglement_text": text.replace("|", "\n") if text else "Aucun reglement defini.",
+    })
+    await interaction.response.send_message(
+        f"Reglement configure :\n**Canal :** {channel.mention}\n**Role :** {role.mention}\n**Texte :** {(text or 'Aucun')[:100]}..."
+    )
+
+
+@config.command(name="reglement-post", description="Poster le panel de reglement")
+@app_commands.checks.has_permissions(administrator=True)
+async def reglement_post(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    settings = load_settings()
+    s = settings.get(gid, {})
+    role_id = s.get("reglement_role")
+    text = s.get("reglement_text", "Aucun reglement defini.")
+
+    if not role_id:
+        await interaction.response.send_message("Configure d'abord le reglement avec `/config reglement`.", ephemeral=True)
+        return
+
+    role = interaction.guild.get_role(int(role_id))
+    if not role:
+        await interaction.response.send_message("Le role configure est introuvable.", ephemeral=True)
+        return
+
+    lines = text.split("\n")
+    reglement_text = "\n".join(f"**{i+1}.** {line.strip()}" for i, line in enumerate(lines) if line.strip())
+
+    view = discord.ui.LayoutView(timeout=None)
+    container = discord.ui.Container(accent_colour=11581636)
+    container.add_item(discord.ui.TextDisplay("## Reglement du serveur"))
+    container.add_item(discord.ui.Separator())
+    container.add_item(discord.ui.TextDisplay(reglement_text if reglement_text else "Aucun reglement defini."))
+    container.add_item(discord.ui.Separator())
+    container.add_item(discord.ui.TextDisplay(
+        f"En cliquant sur **Accepter**, vous confirmez avoir lu et accepte le reglement.\n"
+        f"Le role {role.mention} vous sera automatiquement attribue."
+    ))
+    row = discord.ui.ActionRow()
+    row.add_item(discord.ui.Button(
+        label="Accepter",
+        style=discord.ButtonStyle.success,
+        custom_id="reglement_accept",
+        emoji=discord.PartialEmoji(name="764230verified", id=1544291510189563924, animated=True)
+    ))
+    container.add_item(row)
+    view.add_item(container)
+    await interaction.response.send_message(view=view)
 
 
 # --- AI PANEL ---
