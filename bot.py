@@ -4468,25 +4468,30 @@ async def reglement_post(interaction: discord.Interaction):
         else:
             title = "Reglement"
 
-        embed = discord.Embed(title=title, description=chunk, color=0xB0B8C4)
+        view = discord.ui.LayoutView(timeout=None)
+        container = discord.ui.Container(accent_colour=11581636)
+        container.add_item(discord.ui.TextDisplay(f"## {title}"))
+        container.add_item(discord.ui.Separator())
+        container.add_item(discord.ui.TextDisplay(chunk))
 
         if is_last_overall:
-            embed.set_footer(text=f"En cliquant sur Accepter, vous confirmez avoir lu et accepte l'ensemble du reglement. Le role {role.mention} vous sera attribue.")
+            container.add_item(discord.ui.Separator())
+            container.add_item(discord.ui.TextDisplay(
+                f"En cliquant sur **Accepter**, vous confirmez avoir lu et accepte l'ensemble du reglement.\n"
+                f"Le role {role.mention} vous sera automatiquement attribue."
+            ))
+            row = discord.ui.ActionRow()
+            row.add_item(discord.ui.Button(
+                label="Accepter",
+                style=discord.ButtonStyle.success,
+                custom_id="reglement_accept",
+                emoji=discord.PartialEmoji(name="764230verified", id=1544291510189563924, animated=True)
+            ))
+            container.add_item(row)
 
-        await interaction.channel.send(embed=embed)
+        view.add_item(container)
+        await interaction.channel.send(view=view)
 
-    view = discord.ui.LayoutView(timeout=None)
-    container = discord.ui.Container(accent_colour=11581636)
-    row = discord.ui.ActionRow()
-    row.add_item(discord.ui.Button(
-        label="Accepter",
-        style=discord.ButtonStyle.success,
-        custom_id="reglement_accept",
-        emoji=discord.PartialEmoji(name="764230verified", id=1544291510189563924, animated=True)
-    ))
-    container.add_item(row)
-    view.add_item(container)
-    await interaction.channel.send(view=view)
     await interaction.response.send_message("Reglement publie !", ephemeral=True)
 
 
