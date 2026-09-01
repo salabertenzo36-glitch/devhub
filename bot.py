@@ -4381,11 +4381,13 @@ class ReglementModal(discord.ui.Modal, title="Configuration du Reglement"):
             if part and part.strip():
                 parts.append(part.strip())
 
-        save_settings_field(gid, {
-            "reglement_channel": channel_obj.id,
-            "reglement_role": role_obj.id,
-            "reglement_parts": parts,
-        })
+        settings = load_settings()
+        if gid not in settings:
+            settings[gid] = {}
+        settings[gid]["reglement_channel"] = channel_obj.id
+        settings[gid]["reglement_role"] = role_obj.id
+        settings[gid]["reglement_parts"] = parts
+        save_settings(settings)
 
         await interaction.response.send_message(
             f"Reglement configure !\n**Canal :** {channel_obj.mention}\n**Role :** {role_obj.mention}\n"
