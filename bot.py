@@ -3833,7 +3833,7 @@ async def get_ai_response(message_content, user_name):
     return "Je sais pas quoi dire là."
 
 
-@ai.command(name="toggle", description="Active ou désactive l'IA insolente du bot")
+@ai.command(name="toggle", description="Active ou désactive l'IA du bot")
 @app_commands.describe(state="on ou off")
 @app_commands.choices(state=[
     app_commands.Choice(name="on", value="on"),
@@ -3847,9 +3847,8 @@ async def ai_toggle(interaction: discord.Interaction, state: str):
         settings[gid] = {}
     settings[gid]["ai_enabled"] = state == "on"
     save_settings(settings)
-    status = "activée" if state == "on" else "désactivée"
-    emoji = "🤖" if state == "on" else "😴"
-    await interaction.response.send_message(f"{emoji} IA insolente {status}.")
+    status = "activee" if state == "on" else "desactivee"
+    await interaction.response.send_message(f"IA {status}. Le bot repondra quand on le mentionne.")
 
 # ──────────────────────────────────────────────
 #  PANELS DE CONFIGURATION INTERACTIFS
@@ -3978,11 +3977,16 @@ async def ai_panel(interaction: discord.Interaction):
 
     view = discord.ui.LayoutView(timeout=120)
     container = discord.ui.Container(accent_colour=11581636)
-    container.add_item(discord.ui.TextDisplay("## 🤖 Panel IA Insolente"))
-    container.add_item(discord.ui.TextDisplay(f"**État :** {ai}"))
+    container.add_item(discord.ui.TextDisplay("## Panel IA"))
+    container.add_item(discord.ui.TextDisplay(
+        f"**Etat :** {ai}\n"
+        f"**Mode :** Reponse intelligente (GPT via DuckDuckGo)\n"
+        f"**Usage :** Mentionne le bot + ton message\n"
+        f"**Gratuit :** Pas de cle API requise"
+    ))
     row = discord.ui.ActionRow()
     row.add_item(discord.ui.Button(label="Activer", style=discord.ButtonStyle.success, custom_id="ai_on"))
-    row.add_item(discord.ui.Button(label="Désactiver", style=discord.ButtonStyle.danger, custom_id="ai_off"))
+    row.add_item(discord.ui.Button(label="Desactiver", style=discord.ButtonStyle.danger, custom_id="ai_off"))
     container.add_item(row)
     view.add_item(container)
     await interaction.response.send_message(view=view, ephemeral=True)
