@@ -1500,7 +1500,6 @@ HELP_CATEGORIES = {
         "label": "IA Insolente",
         "emoji": "🤖",
         "commands": [
-            "`/ai toggle` — Activer/désactiver l'IA",
             "`/ai panel` — Panel de configuration",
         ]
     },
@@ -4162,7 +4161,7 @@ AI_RANDOM = [
 async def get_ai_response(message_content, user_name):
     try:
         import g4f
-        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: toggle, panel\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-spam, anti-link, verification gate, lockdown.\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
+        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-spam, anti-link, verification gate, lockdown.\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
         response = g4f.ChatCompletion.create(
             model=g4f.models.gpt_4,
             messages=[
@@ -4178,23 +4177,6 @@ async def get_ai_response(message_content, user_name):
         print(f"AI error: {e}")
     return "Je sais pas quoi dire la."
 
-
-@ai.command(name="toggle", description="Active ou désactive l'IA du bot")
-@app_commands.describe(state="on ou off")
-@app_commands.choices(state=[
-    app_commands.Choice(name="on", value="on"),
-    app_commands.Choice(name="off", value="off"),
-])
-@app_commands.checks.has_permissions(administrator=True)
-async def ai_toggle(interaction: discord.Interaction, state: str):
-    gid = str(interaction.guild.id)
-    settings = load_settings()
-    if gid not in settings:
-        settings[gid] = {}
-    settings[gid]["ai_enabled"] = state == "on"
-    save_settings(settings)
-    status = "activee" if state == "on" else "desactivee"
-    await interaction.response.send_message(f"IA {status}. Le bot repondra quand on le mentionne.")
 
 # ──────────────────────────────────────────────
 #  PANELS DE CONFIGURATION INTERACTIFS
