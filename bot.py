@@ -14,6 +14,17 @@ import aiohttp
 from PIL import Image, ImageDraw, ImageFont
 
 from config import TOKEN
+from db import (
+    connect as db_connect,
+    load_settings, save_settings,
+    load_tickets, save_tickets,
+    load_warns, save_warns,
+    load_jail, save_jail,
+    load_backups, save_backups,
+    load_mod_log, save_mod_log,
+    load_raid_state, save_raid_state,
+    save_ticket_config, save_raid_config,
+)
 
 BOT_START = datetime.now(timezone.utc)
 OWNER_ID = 1167362445032050810
@@ -105,75 +116,6 @@ def mod_or_owner():
 
 
 ROLES_PER_PAGE = 15
-TICKETS_FILE = "tickets.json"
-SETTINGS_FILE = "settings.json"
-
-
-def load_settings():
-    if os.path.exists(SETTINGS_FILE):
-        try:
-            with open(SETTINGS_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
-    return {}
-
-
-def save_settings(data):
-    with open(SETTINGS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def load_tickets():
-    if os.path.exists(TICKETS_FILE):
-        try:
-            with open(TICKETS_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
-    return {}
-
-
-def save_tickets(data):
-    with open(TICKETS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-
-WARNS_FILE = "warns.json"
-
-
-def load_warns():
-    if os.path.exists(WARNS_FILE):
-        try:
-            with open(WARNS_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
-    return {}
-
-
-def save_warns(data):
-    with open(WARNS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-JAIL_FILE = "jail.json"
-
-
-def load_jail():
-    if os.path.exists(JAIL_FILE):
-        try:
-            with open(JAIL_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
-    return {}
-
-
-def save_jail(data):
-    with open(JAIL_FILE, "w") as f:
-        json.dump(data, f, indent=2)
 
 
 def ts(d):
@@ -441,6 +383,7 @@ async def generate_boost_image(member):
 
 @bot.event
 async def on_ready():
+    db_connect()
     print(f"▸ {bot.user.name} connecté")
     print(f"▸ Serveurs : {len(bot.guilds)}")
 
@@ -2399,24 +2342,6 @@ Les candidatures sont ouvertes en permanence. Le staff se réserve le droit de r
 #  BACKUP SYSTEM
 # ──────────────────────────────────────────────
 
-BACKUPS_FILE = "backups.json"
-
-
-def load_backups():
-    if os.path.exists(BACKUPS_FILE):
-        try:
-            with open(BACKUPS_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
-    return {}
-
-
-def save_backups(data):
-    with open(BACKUPS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-
 @backup.command(name="create", description="Créer une backup du serveur (rôles + salons)")
 @admin_or_owner()
 async def backup_create(interaction: discord.Interaction):
@@ -2636,15 +2561,6 @@ def get_ticket_config(guild_id):
     settings = load_settings()
     gid = str(guild_id)
     return settings.get(gid, {}).get("ticket_config", {})
-
-
-def save_ticket_config(guild_id, config):
-    settings = load_settings()
-    gid = str(guild_id)
-    if gid not in settings:
-        settings[gid] = {}
-    settings[gid]["ticket_config"] = config
-    save_settings(settings)
 
 
 @ticket.command(name="config", description="Panel de configuration des tickets")
@@ -3180,24 +3096,6 @@ async def ticket_force_close(interaction: discord.Interaction, channel_id: str):
 # ──────────────────────────────────────────────
 #  MOD LOG HELPER
 # ──────────────────────────────────────────────
-
-MOD_LOG_FILE = "mod_log.json"
-
-
-def load_mod_log():
-    if os.path.exists(MOD_LOG_FILE):
-        try:
-            with open(MOD_LOG_FILE, "r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return {}
-    return {}
-
-
-def save_mod_log(data):
-    with open(MOD_LOG_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
 
 async def log_mod(guild, action, moderator, member, reason="Aucune raison"):
     settings = load_settings()
@@ -3787,21 +3685,6 @@ async def rate(interaction: discord.Interaction, chose: str):
 #  ANTI-RAID INTELLIGENT (SCORE-BASED)
 # ──────────────────────────────────────────────
 
-import json, os
-
-RAID_STATE_FILE = os.path.join(os.path.dirname(__file__), "raid_state.json")
-
-def load_raid_state():
-    try:
-        with open(RAID_STATE_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
-
-def save_raid_state(state):
-    with open(RAID_STATE_FILE, "w") as f:
-        json.dump(state, f, indent=2)
-
 join_tracker = defaultdict(list)
 name_history = defaultdict(list)
 raid_scores = defaultdict(lambda: defaultdict(int))
@@ -3830,13 +3713,6 @@ def get_raid_config(gid):
         "verification_role": s.get("raid_verification_role"),
         "lockdown_overwrite": s.get("raid_lockdown_overwrite", True),
     }
-
-def save_raid_config(gid, config):
-    settings = load_settings()
-    if gid not in settings:
-        settings[gid] = {}
-    settings[gid].update(config)
-    save_settings(settings)
 
 def levenshtein(s1, s2):
     s1 = s1.lower()
