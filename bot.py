@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from config import TOKEN
 
+BOT_START = datetime.now(timezone.utc)
 
 class EOFBot(commands.Bot):
     def __init__(self):
@@ -82,8 +83,11 @@ SETTINGS_FILE = "settings.json"
 
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(SETTINGS_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
     return {}
 
 
@@ -94,8 +98,11 @@ def save_settings(data):
 
 def load_tickets():
     if os.path.exists(TICKETS_FILE):
-        with open(TICKETS_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(TICKETS_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
     return {}
 
 
@@ -110,13 +117,34 @@ WARNS_FILE = "warns.json"
 
 def load_warns():
     if os.path.exists(WARNS_FILE):
-        with open(WARNS_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(WARNS_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
     return {}
 
 
 def save_warns(data):
     with open(WARNS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+JAIL_FILE = "jail.json"
+
+
+def load_jail():
+    if os.path.exists(JAIL_FILE):
+        try:
+            with open(JAIL_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
+    return {}
+
+
+def save_jail(data):
+    with open(JAIL_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
 
@@ -185,11 +213,16 @@ COLORS = {
 FONTS = {
     "bold": "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
     "regular": "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "linux_bold": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "linux_regular": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 }
 
 
 def get_font(style, size):
-    path = FONTS.get(style, FONTS["regular"])
+    import platform
+    if platform.system() == "Linux":
+        style = f"linux_{style}"
+    path = FONTS.get(style, FONTS.get("regular", FONTS.get("linux_regular")))
     try:
         return ImageFont.truetype(path, size)
     except (OSError, IOError):
@@ -378,8 +411,8 @@ async def on_ready():
     print(f"▸ {bot.user.name} connecté")
     print(f"▸ Serveurs : {len(bot.guilds)}")
 
-    activity = discord.Streaming(name="Dev Hub", url="https://www.twitch.tv/devhub")
-    await bot.change_presence(activity=activity, status=discord.Status.dnd)
+    activity = discord.Activity(type=discord.ActivityType.playing, name="EOF Bot")
+    await bot.change_presence(activity=activity, status=discord.Status.online)
 
 
 @bot.event
@@ -643,6 +676,106 @@ async def on_interaction(interaction: discord.Interaction):
             save_settings(settings)
             await interaction.response.send_message("😴 IA désactivée.", ephemeral=True)
 
+    # --- RAID PANEL BUTTONS ---
+    elif cid in ("raid_on", "raid_off", "raid_lockdown", "raid_scan", "raid_massban"):
+        gid = str(interaction.guild.id) if interaction.guild else None
+        if not gid:
+            await interaction.response.send_message("Erreur.", ephemeral=True)
+            return
+
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Permission requise : Administrateur.", ephemeral=True)
+            return
+
+        if cid == "raid_on":
+            save_raid_config(gid, {"anti_raid": True})
+            await interaction.response.send_message("Anti-raid activé.", ephemeral=True)
+
+        elif cid == "raid_off":
+            save_raid_config(gid, {"anti_raid": False})
+            await interaction.response.send_message("Anti-raid desactive.", ephemeral=True)
+
+        elif cid == "raid_lockdown":
+            state_data = load_raid_state()
+            is_locked = state_data.get(gid, {}).get("locked", False)
+            everyone = interaction.guild.default_role
+            count = 0
+            if not is_locked:
+                for channel in interaction.guild.text_channels:
+                    try:
+                        overwrite = channel.overwrites_for(everyone)
+                        overwrite.send_messages = False
+                        await channel.set_permissions(everyone, overwrite=overwrite, reason="Lockdown")
+                        lockdown_channels[gid].add(channel.id)
+                        count += 1
+                    except discord.Forbidden:
+                        pass
+                save_raid_state(state_data | {gid: {"locked": True, "channels": list(lockdown_channels[gid])}})
+                await interaction.response.send_message(f"**{count}** salons verrouilles.", ephemeral=True)
+            else:
+                for channel in interaction.guild.text_channels:
+                    try:
+                        overwrite = channel.overwrites_for(everyone)
+                        overwrite.send_messages = None
+                        await channel.set_permissions(everyone, overwrite=overwrite, reason="Unlockdown")
+                        lockdown_channels[gid].discard(channel.id)
+                        count += 1
+                    except discord.Forbidden:
+                        pass
+                state_data.pop(gid, None)
+                save_raid_state(state_data)
+                await interaction.response.send_message(f"**{count}** salons deverrouilles.", ephemeral=True)
+
+        elif cid == "raid_scan":
+            await interaction.response.defer()
+            config = get_raid_config(gid)
+            suspects = []
+            now = datetime.now(timezone.utc)
+            for member in interaction.guild.members:
+                if member.bot:
+                    continue
+                if any(r.id in config.get("whitelist", []) for r in member.roles):
+                    continue
+                score = 0
+                reasons = []
+                account_age = now - member.created_at
+                if account_age < timedelta(days=config["min_account_age"]):
+                    s = min(15, (config["min_account_age"] - account_age.days) * 2)
+                    score += s
+                    reasons.append(f"Compte age {account_age.days}j")
+                if config["check_avatar"] and is_default_avatar(member):
+                    score += 5
+                    reasons.append("Avatar par defaut")
+                if score >= config["score_kick"]:
+                    suspects.append((member, score, reasons))
+            if not suspects:
+                await interaction.followup.send("Aucun membre suspect detecte.")
+                return
+            lines = [f"**{len(suspects)} membres suspects:**\n"]
+            for member, score, reasons in suspects[:25]:
+                lines.append(f"- {member.mention} (`{member.id}`) — Score `{score}` — {', '.join(reasons)}")
+            if len(suspects) > 25:
+                lines.append(f"\n... et {len(suspects) - 25} autres.")
+            await interaction.followup.send("\n".join(lines))
+
+        elif cid == "raid_massban":
+            await interaction.response.defer()
+            flagged = flagged_members.get(gid, [])
+            if not flagged:
+                await interaction.followup.send("Aucun membre suspect a bannir.")
+                return
+            count = 0
+            for uid in flagged:
+                member = interaction.guild.get_member(uid)
+                if member:
+                    try:
+                        await member.ban(reason="Anti-raid massban", delete_message_seconds=86400)
+                        count += 1
+                    except discord.Forbidden:
+                        pass
+            flagged_members[gid] = []
+            await interaction.followup.send(f"**{count}** membres bannis.")
+
     # --- MODALS (panels) ---
     elif interaction.type == discord.InteractionType.modal_submit:
         gid = str(interaction.guild.id) if interaction.guild else None
@@ -761,7 +894,7 @@ async def welcome_ghostping(interaction: discord.Interaction, action: str, chann
 
     if action == "add":
         if not channels:
-            await interaction.response.send_message("指定至少一个频道。", ephemeral=True)
+            await interaction.response.send_message("Spécifiez au moins un salon.", ephemeral=True)
             return
         ids = []
         for c in channels.split():
@@ -790,7 +923,7 @@ async def welcome_ghostping(interaction: discord.Interaction, action: str, chann
 
     elif action == "remove":
         if not channels:
-            await interaction.response.send_message("指定要移除的频道。", ephemeral=True)
+            await interaction.response.send_message("Spécifiez le salon à retirer.", ephemeral=True)
             return
         if gid in settings and "welcome_ghostpings" in settings[gid]:
             c = channels.strip("<#>")
@@ -1810,8 +1943,11 @@ BACKUPS_FILE = "backups.json"
 
 def load_backups():
     if os.path.exists(BACKUPS_FILE):
-        with open(BACKUPS_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(BACKUPS_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
     return {}
 
 
@@ -2594,8 +2730,11 @@ MOD_LOG_FILE = "mod_log.json"
 
 def load_mod_log():
     if os.path.exists(MOD_LOG_FILE):
-        with open(MOD_LOG_FILE, "r") as f:
-            return json.load(f)
+        try:
+            with open(MOD_LOG_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {}
     return {}
 
 
@@ -2706,30 +2845,37 @@ async def jail(interaction: discord.Interaction, member: discord.Member):
         )
 
     if jail_role in member.roles:
-        for role in member.roles[1:]:
-            if role != jail_role and role != guild.default_role:
-                try:
-                    await member.add_roles(role)
-                except discord.Forbidden:
-                    pass
-        await member.remove_roles(jail_role)
-        await interaction.response.send_message(f"{member.mention} libéré de la prison.")
-    else:
-        backup_roles = [r.id for r in member.roles[1:] if r != jail_role]
-        warns = load_warns()
+        jail_data = load_jail()
         gid = str(guild.id)
         mid = str(member.id)
-        if gid not in warns:
-            warns[gid] = {}
-        if mid not in warns[gid]:
-            warns[gid][mid] = []
-        warns[gid][mid].append({
-            "reason": "[JAIL] Roles sauvegardés",
-            "by": interaction.user.id,
-            "at": datetime.now(timezone.utc).isoformat(),
-            "backup_roles": backup_roles
-        })
-        save_warns(warns)
+        backup_role_ids = jail_data.get(gid, {}).get(mid, {}).get("roles", [])
+        restored = 0
+        for role_id in backup_role_ids:
+            role = guild.get_role(role_id)
+            if role:
+                try:
+                    await member.add_roles(role)
+                    restored += 1
+                except discord.Forbidden:
+                    pass
+        if gid in jail_data and mid in jail_data[gid]:
+            del jail_data[gid][mid]
+            save_jail(jail_data)
+        await member.remove_roles(jail_role)
+        await interaction.response.send_message(f"{member.mention} libéré de la prison. `{restored}` rôles restaurés.")
+    else:
+        backup_roles = [r.id for r in member.roles[1:] if r != jail_role]
+        jail_data = load_jail()
+        gid = str(guild.id)
+        mid = str(member.id)
+        if gid not in jail_data:
+            jail_data[gid] = {}
+        jail_data[gid][mid] = {
+            "roles": backup_roles,
+            "jailed_at": datetime.now(timezone.utc).isoformat(),
+            "jailed_by": interaction.user.id,
+        }
+        save_jail(jail_data)
 
         await member.edit(roles=[jail_role])
         await log_mod(interaction.guild, "Jail", interaction.user, member)
@@ -3063,7 +3209,7 @@ async def remind(interaction: discord.Interaction, duration: str, message: str):
 
 @util.command(name="uptime", description="Affiche le temps de fonctionnement du bot")
 async def uptime(interaction: discord.Interaction):
-    delta = datetime.now(timezone.utc) - bot.user.created_at
+    delta = datetime.now(timezone.utc) - BOT_START
     hours, remainder = divmod(int(delta.total_seconds()), 3600)
     minutes, seconds = divmod(remainder, 60)
     days, hours = divmod(hours, 24)
@@ -3074,7 +3220,7 @@ async def uptime(interaction: discord.Interaction):
 @util.command(name="bot-info", description="Affiche les informations du bot")
 async def bot_info(interaction: discord.Interaction):
     latency = round(bot.latency * 1000)
-    uptime_sec = (datetime.now(timezone.utc) - bot.user.created_at).total_seconds()
+    uptime_sec = (datetime.now(timezone.utc) - BOT_START).total_seconds()
     hours, remainder = divmod(int(uptime_sec), 3600)
     minutes, seconds = divmod(remainder, 60)
     days, hours = divmod(hours, 24)
@@ -3170,7 +3316,7 @@ async def ship(interaction: discord.Interaction, user1: discord.Member, user2: d
 async def rate(interaction: discord.Interaction, chose: str):
     score = random.randint(0, 10)
     bar_len = 10
-    filled = int(bar_len * score / 100)
+    filled = int(bar_len * score / 10)
     bar = "█" * filled + "░" * (bar_len - filled)
     await interaction.response.send_message(f"📊 Je note **{chose}** : `{score}/10`")
 
@@ -4282,7 +4428,7 @@ async def mod_panel(interaction: discord.Interaction):
     gid = str(interaction.guild.id)
     s = settings.get(gid, {})
     automod = "ON" if s.get("automod_enabled") else "OFF"
-    log_ch = interaction.guild.get_channel(s.get("mod_log_channel")) if s.get("mod_log_channel") else None
+    log_ch = interaction.guild.get_channel(s.get("mod_log")) if s.get("mod_log") else None
     log_text = log_ch.mention if log_ch else "Non configuré"
 
     view = discord.ui.LayoutView(timeout=120)
