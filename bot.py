@@ -17,7 +17,7 @@ from config import TOKEN
 
 BOT_START = datetime.now(timezone.utc)
 
-class DevHubBot(commands.Bot):
+class DevHub(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
@@ -74,7 +74,7 @@ class PersistentTicketClose(discord.ui.LayoutView):
         self.add_item(container)
 
 
-bot = DevHubBot()
+bot = DevHub()
 
 ROLES_PER_PAGE = 15
 TICKETS_FILE = "tickets.json"
