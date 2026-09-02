@@ -4978,7 +4978,7 @@ async def reglement_post(interaction: discord.Interaction):
                 label="Accepter",
                 style=discord.ButtonStyle.success,
                 custom_id="reglement_accept",
-                emoji=discord.PartialEmoji(name="243574pastelblueverifiedanimated", id=1544341969755705447, animated=True)
+                emoji="✅"
             ))
             container.add_item(row)
 
