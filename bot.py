@@ -259,46 +259,48 @@ async def fetch_avatar(url):
 
 
 async def generate_welcome_image(member):
-    W, H = 900, 420
+    W, H = 1000, 480
     img = Image.new("RGBA", (W, H), COLORS["bg"] + (255,))
     draw = ImageDraw.Draw(img)
 
-    draw_rounded_rect(draw, (0, 0, W - 1, H - 1), radius=20, fill=COLORS["surface"] + (255,))
+    draw_rounded_rect(draw, (0, 0, W - 1, H - 1), radius=24, fill=COLORS["surface"] + (255,))
 
     for i in range(W):
-        alpha = max(0, 0.08 - abs(i - W / 2) / (W / 2) * 0.08)
+        alpha = max(0, 0.1 - abs(i - W / 2) / (W / 2) * 0.1)
         c = COLORS["accent"]
         draw.point((i, 0), fill=c + (int(alpha * 255),))
         draw.point((i, 1), fill=c + (int(alpha * 200),))
+        draw.point((i, 2), fill=c + (int(alpha * 150),))
 
     avatar = await fetch_avatar(member.display_avatar.url)
-    draw_circle_avatar(img, avatar, (160, 190), 75)
+    draw_circle_avatar(img, avatar, (170, 210), 90)
 
-    draw.ellipse((82, 112, 84 + 152, 114 + 152), outline=COLORS["accent"] + (60,), width=1)
+    draw.ellipse((70, 110, 72 + 200, 112 + 200), outline=COLORS["accent"] + (80,), width=2)
 
-    font_title = get_font("bold", 38)
-    font_sub = get_font("regular", 20)
-    font_small = get_font("regular", 14)
+    font_title = get_font("bold", 48)
+    font_name = get_font("bold", 34)
+    font_sub = get_font("regular", 22)
+    font_small = get_font("regular", 16)
 
-    draw.text((280, 120), "Bienvenue", fill=COLORS["accent"], font=font_title)
+    draw.text((300, 120), "Bienvenue", fill=COLORS["accent"], font=font_title)
 
     name = member.display_name
-    if len(name) > 22:
-        name = name[:20] + ".."
-    draw.text((280, 172), name, fill=COLORS["white"], font=get_font("bold", 28))
+    if len(name) > 26:
+        name = name[:24] + ".."
+    draw.text((300, 180), name, fill=COLORS["white"], font=font_name)
 
-    draw.text((280, 212), f"sur {member.guild.name}", fill=COLORS["dim"], font=font_sub)
+    draw.text((300, 226), f"sur {member.guild.name}", fill=COLORS["dim"], font=font_sub)
 
-    draw.line((280, 250, 680, 250), fill=COLORS["accent"] + (40,), width=1)
+    draw.line((300, 270, 720, 270), fill=COLORS["accent"] + (50,), width=1)
 
     member_count = member.guild.member_count
-    draw.text((280, 268), f"Membre #{member_count}", fill=COLORS["silver"], font=font_sub)
+    draw.text((300, 290), f"Membre #{member_count}", fill=COLORS["silver"], font=font_sub)
 
     created = member.created_at.strftime("%d/%m/%Y")
-    draw.text((280, 300), f"Compte créé le {created}", fill=COLORS["muted"], font=font_small)
+    draw.text((300, 330), f"Compte créé le {created}", fill=COLORS["muted"], font=font_small)
 
-    draw.line((40, H - 50, W - 40, H - 50), fill=COLORS["accent"] + (30,), width=1)
-    draw.text((W // 2 - 40, H - 40), "Dev Hub", fill=COLORS["muted"], font=font_small)
+    draw.line((40, H - 55, W - 40, H - 55), fill=COLORS["accent"] + (30,), width=1)
+    draw.text((W // 2 - 50, H - 44), "Dev Hub", fill=COLORS["muted"], font=font_small)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -307,11 +309,11 @@ async def generate_welcome_image(member):
 
 
 async def generate_goodbye_image(member):
-    W, H = 900, 420
+    W, H = 1000, 480
     img = Image.new("RGBA", (W, H), COLORS["bg"] + (255,))
     draw = ImageDraw.Draw(img)
 
-    draw_rounded_rect(draw, (0, 0, W - 1, H - 1), radius=20, fill=COLORS["surface"] + (255,))
+    draw_rounded_rect(draw, (0, 0, W - 1, H - 1), radius=24, fill=COLORS["surface"] + (255,))
 
     for i in range(W):
         alpha = max(0, 0.06 - abs(i - W / 2) / (W / 2) * 0.06)
@@ -329,30 +331,31 @@ async def generate_goodbye_image(member):
         gray_list.append((avg, avg, avg, a))
     avatar_gray.putdata(gray_list)
 
-    draw_circle_avatar(img, avatar_gray, (160, 190), 75)
+    draw_circle_avatar(img, avatar_gray, (170, 210), 90)
 
-    draw.ellipse((82, 112, 84 + 152, 114 + 152), outline=COLORS["dim"] + (40,), width=1)
+    draw.ellipse((70, 110, 72 + 200, 112 + 200), outline=COLORS["dim"] + (50,), width=2)
 
-    font_title = get_font("bold", 38)
-    font_sub = get_font("regular", 20)
-    font_small = get_font("regular", 14)
+    font_title = get_font("bold", 48)
+    font_name = get_font("bold", 34)
+    font_sub = get_font("regular", 22)
+    font_small = get_font("regular", 16)
 
-    draw.text((280, 120), "Au revoir", fill=COLORS["dim"], font=font_title)
+    draw.text((300, 120), "Au revoir", fill=COLORS["dim"], font=font_title)
 
     name = member.display_name
-    if len(name) > 22:
-        name = name[:20] + ".."
-    draw.text((280, 172), name, fill=COLORS["white"], font=get_font("bold", 28))
+    if len(name) > 26:
+        name = name[:24] + ".."
+    draw.text((300, 180), name, fill=COLORS["white"], font=font_name)
 
-    draw.text((280, 212), f"a quitté {member.guild.name}", fill=COLORS["muted"], font=font_sub)
+    draw.text((300, 226), f"a quitté {member.guild.name}", fill=COLORS["muted"], font=font_sub)
 
-    draw.line((280, 250, 680, 250), fill=COLORS["dim"] + (30,), width=1)
+    draw.line((300, 270, 720, 270), fill=COLORS["dim"] + (40,), width=1)
 
     member_count = member.guild.member_count
-    draw.text((280, 268), f"Il reste {member_count} membres", fill=COLORS["dim"], font=font_sub)
+    draw.text((300, 290), f"Il reste {member_count} membres", fill=COLORS["dim"], font=font_sub)
 
-    draw.line((40, H - 50, W - 40, H - 50), fill=COLORS["dim"] + (20,), width=1)
-    draw.text((W // 2 - 40, H - 40), "Dev Hub", fill=COLORS["muted"], font=font_small)
+    draw.line((40, H - 55, W - 40, H - 55), fill=COLORS["dim"] + (25,), width=1)
+    draw.text((W // 2 - 50, H - 44), "Dev Hub", fill=COLORS["muted"], font=font_small)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -361,44 +364,46 @@ async def generate_goodbye_image(member):
 
 
 async def generate_boost_image(member):
-    W, H = 900, 420
+    W, H = 1000, 480
     img = Image.new("RGBA", (W, H), COLORS["bg"] + (255,))
     draw = ImageDraw.Draw(img)
 
-    draw_rounded_rect(draw, (0, 0, W - 1, H - 1), radius=20, fill=COLORS["surface"] + (255,))
+    draw_rounded_rect(draw, (0, 0, W - 1, H - 1), radius=24, fill=COLORS["surface"] + (255,))
 
     for i in range(W):
         progress = i / W
-        wave = (0.5 + 0.5 * __import__('math').sin(progress * 6.28)) * 0.12
+        wave = (0.5 + 0.5 * math.sin(progress * 6.28)) * 0.14
         c = COLORS["accent"]
         draw.point((i, 0), fill=c + (int(wave * 255),))
         draw.point((i, 1), fill=c + (int(wave * 200),))
+        draw.point((i, 2), fill=c + (int(wave * 150),))
 
     avatar = await fetch_avatar(member.display_avatar.url)
-    draw_circle_avatar(img, avatar, (160, 190), 75)
+    draw_circle_avatar(img, avatar, (170, 210), 90)
 
-    draw.ellipse((82, 112, 84 + 152, 114 + 152), outline=COLORS["accent"] + (80,), width=2)
+    draw.ellipse((70, 110, 72 + 200, 112 + 200), outline=COLORS["accent"] + (100,), width=2)
 
-    font_title = get_font("bold", 38)
-    font_sub = get_font("regular", 20)
-    font_small = get_font("regular", 14)
+    font_title = get_font("bold", 48)
+    font_name = get_font("bold", 34)
+    font_sub = get_font("regular", 22)
+    font_small = get_font("regular", 16)
 
-    draw.text((280, 120), "Boost", fill=COLORS["accent"], font=font_title)
+    draw.text((300, 120), "Boost", fill=COLORS["accent"], font=font_title)
 
     name = member.display_name
-    if len(name) > 22:
-        name = name[:20] + ".."
-    draw.text((280, 172), name, fill=COLORS["white"], font=get_font("bold", 28))
+    if len(name) > 26:
+        name = name[:24] + ".."
+    draw.text((300, 180), name, fill=COLORS["white"], font=font_name)
 
-    draw.text((280, 212), f"a boosté {member.guild.name}", fill=COLORS["silver"], font=font_sub)
+    draw.text((300, 226), f"a boosté {member.guild.name}", fill=COLORS["silver"], font=font_sub)
 
-    draw.line((280, 250, 680, 250), fill=COLORS["accent"] + (50,), width=1)
+    draw.line((300, 270, 720, 270), fill=COLORS["accent"] + (50,), width=1)
 
     boost_count = member.guild.premium_subscription_count or 0
-    draw.text((280, 268), f"Boost total : {boost_count}", fill=COLORS["accent"], font=font_sub)
+    draw.text((300, 290), f"Boost total : {boost_count}", fill=COLORS["accent"], font=font_sub)
 
-    draw.line((40, H - 50, W - 40, H - 50), fill=COLORS["accent"] + (30,), width=1)
-    draw.text((W // 2 - 40, H - 40), "Dev Hub", fill=COLORS["muted"], font=font_small)
+    draw.line((40, H - 55, W - 40, H - 55), fill=COLORS["accent"] + (30,), width=1)
+    draw.text((W // 2 - 50, H - 44), "Dev Hub", fill=COLORS["muted"], font=font_small)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
