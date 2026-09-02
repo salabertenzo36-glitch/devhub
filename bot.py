@@ -430,7 +430,8 @@ async def on_ready():
             "hierarchie", "tickets", "ghostping", "welcome", "automod", "salon",
             "bug", "suggestion", "support", "report", "autre", "music", "cleanup"
         }
-        for guild in bot.guilds:
+        guild = bot.get_guild(1522408621256736878)
+        if guild:
             existing = {e.name: e for e in guild.emojis}
             for name in OUR_EMOJIS:
                 if name in existing:
