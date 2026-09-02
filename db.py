@@ -1,32 +1,51 @@
 import os
+import sys
 from pymongo import MongoClient
 
 MONGO_URI = os.environ.get("MONGO_URI", "")
 _client = None
 _db = None
+_connected = False
 
 
 def connect():
-    global _client, _db
+    global _client, _db, _connected
     if not MONGO_URI:
-        raise RuntimeError("MONGO_URI environment variable is not set")
-    _client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
-    _db = _client["devhub"]
-    _client.admin.command("ping")
-    print("▸ MongoDB connecté")
+        print("▸ MONGO_URI non défini — MongoDB indisponible (données en mémoire)")
+        return
+    try:
+        _client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        _db = _client["devhub"]
+        _client.admin.command("ping")
+        _connected = True
+        print("▸ MongoDB connecté")
+    except Exception as e:
+        print(f"▸ MongoDB erreur : {e}")
 
 
-def _load(collection):
-    doc = _db[collection].find_one({"_id": "data"})
-    if doc:
-        doc.pop("_id", None)
-        return doc
-    return {}
+def _load(collection, default=None):
+    if default is None:
+        default = {}
+    if not _connected or _db is None:
+        return default
+    try:
+        doc = _db[collection].find_one({"_id": "data"})
+        if doc:
+            doc.pop("_id", None)
+            return doc
+    except Exception:
+        pass
+    return default
 
 
 def _save(collection, data):
-    data["_id"] = "data"
-    _db[collection].replace_one({"_id": "data"}, data, upsert=True)
+    if not _connected or _db is None:
+        return
+    try:
+        data["_id"] = "data"
+        _db[collection].replace_one({"_id": "data"}, data, upsert=True)
+    except Exception:
+        pass
 
 
 def load_settings():
