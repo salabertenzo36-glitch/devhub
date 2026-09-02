@@ -511,6 +511,73 @@ async def on_interaction(interaction: discord.Interaction):
         if value:
             await handle_ticket_open(interaction, value)
 
+    # --- TICKET: CLAIM ---
+    elif custom_id.startswith("ticket_claim_"):
+        channel_id = custom_id.replace("ticket_claim_", "")
+        if str(interaction.channel.id) != channel_id:
+            return
+        tickets = load_tickets()
+        gid = str(interaction.guild.id)
+        cid = str(interaction.channel.id)
+        if gid not in tickets or cid not in tickets[gid]:
+            await interaction.response.send_message("Ticket introuvable.", ephemeral=True)
+            return
+        ticket = tickets[gid][cid]
+        if ticket.get("claimed_by"):
+            claimer = interaction.guild.get_member(ticket["claimed_by"])
+            claimer_name = claimer.display_name if claimer else "Inconnu"
+            await interaction.response.send_message(f"Ce ticket est déjà claim par **{claimer_name}**.", ephemeral=True)
+            return
+        ticket["claimed_by"] = interaction.user.id
+        ticket["claimed_at"] = datetime.now(timezone.utc).isoformat()
+        save_tickets(tickets)
+        view = view_text(
+            f"## Ticket Claim",
+            f"**Claim par** {interaction.user.mention}",
+            f"**Le** <t:{int(datetime.now(timezone.utc).timestamp())}:R>"
+        )
+        await interaction.response.send_message(view=view)
+
+    # --- TICKET: ADD MEMBER ---
+    elif custom_id.startswith("ticket_add_"):
+        channel_id = custom_id.replace("ticket_add_", "")
+        if str(interaction.channel.id) != channel_id:
+            return
+        modal = discord.ui.Modal(title="Ajouter un membre", custom_id=f"ticket_add_modal_{channel_id}")
+        modal.add_item(discord.ui.TextInput(label="ID ou mention du membre", placeholder="123456789012345678 ou @user"))
+        await interaction.response.send_modal(modal)
+
+    # --- TICKET: REMOVE MEMBER ---
+    elif custom_id.startswith("ticket_remove_"):
+        channel_id = custom_id.replace("ticket_remove_", "")
+        if str(interaction.channel.id) != channel_id:
+            return
+        modal = discord.ui.Modal(title="Retirer un membre", custom_id=f"ticket_remove_modal_{channel_id}")
+        modal.add_item(discord.ui.TextInput(label="ID ou mention du membre", placeholder="123456789012345678 ou @user"))
+        await interaction.response.send_modal(modal)
+
+    # --- TICKET: TRANSCRIPT ---
+    elif custom_id.startswith("ticket_transcript_"):
+        channel_id = custom_id.replace("ticket_transcript_", "")
+        if str(interaction.channel.id) != channel_id:
+            return
+        await interaction.response.defer(ephemeral=True)
+        messages = []
+        async for message in interaction.channel.history(limit=500, oldest_first=True):
+            if not message.author.bot:
+                messages.append(f"[{message.created_at.strftime('%d/%m/%Y %H:%M')}] {message.author.display_name}: {message.content}")
+            elif message.embeds:
+                for e in message.embeds:
+                    if e.description:
+                        messages.append(f"[{message.created_at.strftime('%d/%m/%Y %H:%M')}] {message.author.display_name}: {e.description}")
+        transcript = "\n".join(messages) if messages else "Aucun message."
+        file = discord.File(
+            fp=io.BytesIO(transcript.encode()),
+            filename=f"transcript-{interaction.channel.name}.txt"
+        )
+        await interaction.followup.send("Transcript généré :", file=file, ephemeral=True)
+
+    # --- TICKET: CLOSE ---
     elif custom_id.startswith("ticket_close_"):
         channel_id = custom_id.replace("ticket_close_", "")
         if str(interaction.channel.id) != channel_id:
@@ -548,7 +615,7 @@ async def on_interaction(interaction: discord.Interaction):
                         messages.append(f"[{message.created_at.strftime('%d/%m/%Y %H:%M')}] {message.author.display_name}: {message.content}")
                 transcript = "\n".join(messages) if messages else "Aucun message."
                 file = discord.File(
-                    fp=__import__('io').BytesIO(transcript.encode()),
+                    fp=io.BytesIO(transcript.encode()),
                     filename=f"transcript-{interaction.channel.name}.txt"
                 )
                 await log_ch.send(
@@ -868,6 +935,63 @@ async def on_interaction(interaction: discord.Interaction):
             except ValueError:
                 pass
             await interaction.response.send_message("Salon introuvable.", ephemeral=True)
+
+        # --- TICKET: ADD MEMBER MODAL ---
+        elif cid.startswith("ticket_add_modal_"):
+            channel_id = cid.replace("ticket_add_modal_", "")
+            if str(interaction.channel.id) != channel_id:
+                return
+            user_input = value.strip("<@!>")
+            try:
+                member_id = int(user_input)
+                target = interaction.guild.get_member(member_id)
+            except ValueError:
+                await interaction.response.send_message("ID invalide.", ephemeral=True)
+                return
+            if not target:
+                await interaction.response.send_message("Membre introuvable.", ephemeral=True)
+                return
+            await interaction.channel.set_permissions(target, view_channel=True, send_messages=True, attach_files=True)
+            tickets = load_tickets()
+            gid = str(interaction.guild.id)
+            cid_ticket = str(interaction.channel.id)
+            if gid in tickets and cid_ticket in tickets[gid]:
+                extra = tickets[gid][cid_ticket].get("extra_members", [])
+                if member_id not in extra:
+                    extra.append(member_id)
+                    tickets[gid][cid_ticket]["extra_members"] = extra
+                    save_tickets(tickets)
+            await interaction.response.send_message(f"{target.mention} ajouté au ticket par {interaction.user.mention}.")
+
+        # --- TICKET: REMOVE MEMBER MODAL ---
+        elif cid.startswith("ticket_remove_modal_"):
+            channel_id = cid.replace("ticket_remove_modal_", "")
+            if str(interaction.channel.id) != channel_id:
+                return
+            user_input = value.strip("<@!>")
+            try:
+                member_id = int(user_input)
+                target = interaction.guild.get_member(member_id)
+            except ValueError:
+                await interaction.response.send_message("ID invalide.", ephemeral=True)
+                return
+            if not target:
+                await interaction.response.send_message("Membre introuvable.", ephemeral=True)
+                return
+            if target.id == interaction.user.id:
+                await interaction.response.send_message("Vous ne pouvez pas vous retirer vous-même.", ephemeral=True)
+                return
+            await interaction.channel.set_permissions(target, overwrite=None)
+            tickets = load_tickets()
+            gid = str(interaction.guild.id)
+            cid_ticket = str(interaction.channel.id)
+            if gid in tickets and cid_ticket in tickets[gid]:
+                extra = tickets[gid][cid_ticket].get("extra_members", [])
+                if member_id in extra:
+                    extra.remove(member_id)
+                    tickets[gid][cid_ticket]["extra_members"] = extra
+                    save_tickets(tickets)
+            await interaction.response.send_message(f"{target.mention} retiré du ticket par {interaction.user.mention}.")
 
 
 # ──────────────────────────────────────────────
@@ -2508,7 +2632,11 @@ async def handle_ticket_open(interaction: discord.Interaction, ticket_type: str,
     container.add_item(discord.ui.Separator())
 
     row = discord.ui.ActionRow()
-    row.add_item(discord.ui.Button(label="Fermer le ticket", style=discord.ButtonStyle.danger, custom_id=f"ticket_close_{channel.id}"))
+    row.add_item(discord.ui.Button(label="Claim", style=discord.ButtonStyle.success, custom_id=f"ticket_claim_{channel.id}", emoji="✋"))
+    row.add_item(discord.ui.Button(label="Ajouter", style=discord.ButtonStyle.primary, custom_id=f"ticket_add_{channel.id}", emoji="➕"))
+    row.add_item(discord.ui.Button(label="Retirer", style=discord.ButtonStyle.primary, custom_id=f"ticket_remove_{channel.id}", emoji="➖"))
+    row.add_item(discord.ui.Button(label="Transcript", style=discord.ButtonStyle.secondary, custom_id=f"ticket_transcript_{channel.id}", emoji="📄"))
+    row.add_item(discord.ui.Button(label="Fermer", style=discord.ButtonStyle.danger, custom_id=f"ticket_close_{channel.id}", emoji="🔒"))
     container.add_item(row)
 
     view.add_item(container)
@@ -2636,7 +2764,7 @@ async def close_ticket(interaction: discord.Interaction):
                     messages.append(f"[{message.created_at.strftime('%d/%m/%Y %H:%M')}] {message.author.display_name}: {message.content}")
             transcript = "\n".join(messages) if messages else "Aucun message."
             file = discord.File(
-                fp=__import__('io').BytesIO(transcript.encode()),
+                fp=io.BytesIO(transcript.encode()),
                 filename=f"transcript-{interaction.channel.name}.txt"
             )
             await log_ch.send(
@@ -2719,7 +2847,7 @@ async def ticket_transcript(interaction: discord.Interaction):
             messages.append(f"[{message.created_at.strftime('%d/%m/%Y %H:%M')}] {message.author.display_name}: {message.content}")
     transcript = "\n".join(messages) if messages else "Aucun message."
     file = discord.File(
-        fp=__import__('io').BytesIO(transcript.encode()),
+        fp=io.BytesIO(transcript.encode()),
         filename=f"transcript-{interaction.channel.name}.txt"
     )
     await interaction.response.send_message("Transcript généré.", ephemeral=True)
