@@ -50,27 +50,6 @@ ghostping = app_commands.Group(name="ghostping", description="Ghostping & Autoro
 ai = app_commands.Group(name="ai", description="Intelligence artificielle")
 
 
-@bot.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    raise error
-
-
-def admin_or_owner():
-    async def predicate(interaction: discord.Interaction) -> bool:
-        if is_owner(interaction.user):
-            return True
-        return interaction.user.guild_permissions.administrator
-    return app_commands.check(predicate)
-
-
-def mod_or_owner():
-    async def predicate(interaction: discord.Interaction) -> bool:
-        if is_owner(interaction.user):
-            return True
-        return interaction.user.guild_permissions.moderate_members
-    return app_commands.check(predicate)
-
-
 class PersistentTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -102,6 +81,28 @@ class PersistentTicketClose(discord.ui.LayoutView):
 
 
 bot = DevHub()
+
+
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    raise error
+
+
+def admin_or_owner():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if is_owner(interaction.user):
+            return True
+        return interaction.user.guild_permissions.administrator
+    return app_commands.check(predicate)
+
+
+def mod_or_owner():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if is_owner(interaction.user):
+            return True
+        return interaction.user.guild_permissions.moderate_members
+    return app_commands.check(predicate)
+
 
 ROLES_PER_PAGE = 15
 TICKETS_FILE = "tickets.json"
