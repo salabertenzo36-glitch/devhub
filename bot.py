@@ -1506,6 +1506,21 @@ HELP_CATEGORIES = {
 }
 
 
+EMOJI_FALLBACKS = {
+    "mod": "🔨",
+    "mod_avancee": "🛡️",
+    "welcome": "📢",
+    "tickets": "💬",
+    "utilitaires": "🔧",
+    "fun": "⭐",
+    "stats": "📊",
+    "automod": "🤖",
+    "ghostping": "👻",
+    "music": "🎵",
+    "backup": "💾",
+    "ai": "🤖",
+}
+
 def make_help_view(category_key):
     cat = HELP_CATEGORIES[category_key]
     view = discord.ui.LayoutView()
@@ -1521,17 +1536,12 @@ def make_help_view(category_key):
 
     options = []
     for key, val in HELP_CATEGORIES.items():
-        emoji_str = val["emoji"]
-        if emoji_str.startswith("<:"):
-            emoji_id = int(emoji_str.split(":")[-1].rstrip(">"))
-            emoji_obj = discord.PartialEmoji(name=emoji_str.split(":")[1], id=emoji_id)
-        else:
-            emoji_obj = emoji_str
+        fallback = EMOJI_FALLBACKS.get(key, "❓")
         options.append(discord.SelectOption(
             label=val["label"],
             value=key,
             description=f"{len(val['commands'])} commandes",
-            emoji=emoji_obj
+            emoji=fallback
         ))
 
     row = discord.ui.ActionRow()
@@ -1554,7 +1564,7 @@ HELP_PERSISTENT_CATEGORY = "mod"
 @bot.tree.command(name="help", description="Affiche la liste des commandes par categorie")
 @app_commands.describe(category="Categorie de commandes")
 @app_commands.choices(category=[
-    app_commands.Choice(name=f"{v['emoji']} {v['label']}", value=k)
+    app_commands.Choice(name=f"{EMOJI_FALLBACKS.get(k, '❓')} {v['label']}", value=k)
     for k, v in HELP_CATEGORIES.items()
 ])
 async def help_cmd(interaction: discord.Interaction, category: str = "mod"):
