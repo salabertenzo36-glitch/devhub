@@ -16,6 +16,12 @@ from PIL import Image, ImageDraw, ImageFont
 from config import TOKEN
 
 BOT_START = datetime.now(timezone.utc)
+OWNER_ID = 1167362445032050810
+
+
+def is_owner(user):
+    return user.id == OWNER_ID
+
 
 class DevHub(commands.Bot):
     def __init__(self):
@@ -42,6 +48,27 @@ stats = app_commands.Group(name="stats", description="Statistiques")
 raid = app_commands.Group(name="raid", description="Anti-raid")
 ghostping = app_commands.Group(name="ghostping", description="Ghostping & Autorole")
 ai = app_commands.Group(name="ai", description="Intelligence artificielle")
+
+
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    raise error
+
+
+def admin_or_owner():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if is_owner(interaction.user):
+            return True
+        return interaction.user.guild_permissions.administrator
+    return app_commands.check(predicate)
+
+
+def mod_or_owner():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if is_owner(interaction.user):
+            return True
+        return interaction.user.guild_permissions.moderate_members
+    return app_commands.check(predicate)
 
 
 class PersistentTicketView(discord.ui.View):
@@ -808,7 +835,7 @@ async def on_interaction(interaction: discord.Interaction):
         gid = str(interaction.guild.id) if interaction.guild else None
         if not gid:
             return
-        if not interaction.user.guild_permissions.administrator:
+        if not interaction.user.guild_permissions.administrator and not is_owner(interaction.user):
             await interaction.response.send_message("Permission requise : Administrateur.", ephemeral=True)
             return
 
@@ -930,7 +957,7 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_message("Erreur.", ephemeral=True)
             return
 
-        if not interaction.user.guild_permissions.administrator:
+        if not interaction.user.guild_permissions.administrator and not is_owner(interaction.user):
             await interaction.response.send_message("Permission requise : Administrateur.", ephemeral=True)
             return
 
@@ -1263,7 +1290,7 @@ async def on_interaction(interaction: discord.Interaction):
 
 @ghostping.command(name="send", description="Ghostping tous les membres d'un salon un par un")
 @app_commands.describe(channel="Le salon cible")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def ghostping_send(interaction: discord.Interaction, channel: discord.TextChannel):
     await interaction.response.send_message(f"Ghostping dans {channel.mention}...", ephemeral=True)
 
@@ -1292,7 +1319,7 @@ async def ghostping_send(interaction: discord.Interaction, channel: discord.Text
     app_commands.Choice(name="remove", value="remove"),
     app_commands.Choice(name="clear", value="clear"),
 ])
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def welcome_ghostping(interaction: discord.Interaction, action: str, channels: str = None):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -1354,7 +1381,7 @@ async def welcome_ghostping(interaction: discord.Interaction, action: str, chann
 
 @config.command(name="autorole", description="Définit un rôle automatique à l'arrivée des membres")
 @app_commands.describe(role="Le rôle à attribuer (laisser vide pour désactiver)")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def autorole(interaction: discord.Interaction, role: discord.Role = None):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -1445,7 +1472,7 @@ async def warnings(interaction: discord.Interaction, member: discord.Member):
 
 @mod.command(name="clearwarns", description="Supprime les warns d'un membre")
 @app_commands.describe(member="Le membre")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def clearwarns(interaction: discord.Interaction, member: discord.Member):
     warns = load_warns()
     gid = str(interaction.guild.id)
@@ -1560,7 +1587,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
 
 @mod.command(name="timeout", description="Timeout un membre (format : 1h30m)")
 @app_commands.describe(member="Le membre", duration="Durée (ex: 1h30m, 30m, 2d)", reason="Raison")
-@app_commands.checks.has_permissions(moderate_members=True)
+@mod_or_owner()
 async def timeout(interaction: discord.Interaction, member: discord.Member, duration: str, reason: str = "Aucune raison"):
     total = 0
     current = ""
@@ -1841,7 +1868,7 @@ async def boosts(interaction: discord.Interaction):
 
 @util.command(name="say", description="Le bot envoie un message")
 @app_commands.describe(message="Le message à envoyer", channel="Le salon cible")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def say(interaction: discord.Interaction, message: str, channel: discord.TextChannel = None):
     channel = channel or interaction.channel
     await interaction.response.send_message("Message envoyé.", ephemeral=True)
@@ -1850,7 +1877,7 @@ async def say(interaction: discord.Interaction, message: str, channel: discord.T
 
 @util.command(name="embed", description="Crée un embed personnalisé")
 @app_commands.describe(title="Titre", description="Description", channel="Salon cible")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def embed(interaction: discord.Interaction, title: str, description: str, channel: discord.TextChannel = None):
     channel = channel or interaction.channel
     view = view_text(f"## {title}", description)
@@ -2120,7 +2147,7 @@ async def help_cmd(interaction: discord.Interaction, category: str = "mod"):
 # ──────────────────────────────────────────────
 
 @util.command(name="effectif", description="Affiche l'effectif complet du serveur par rôle")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def effectif(interaction: discord.Interaction):
     await interaction.response.defer()
     guild = interaction.guild
@@ -2216,7 +2243,7 @@ async def staff(interaction: discord.Interaction):
 
 @config.command(name="staff-roles", description="Définir les rôles staff (laisser vide = tous les admins)")
 @app_commands.describe(roles="Les rôles à considérer comme staff")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def set_staff_roles(interaction: discord.Interaction, roles: str = ""):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -2365,7 +2392,7 @@ def save_backups(data):
 
 
 @backup.command(name="create", description="Créer une backup du serveur (rôles + salons)")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def backup_create(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     guild = interaction.guild
@@ -2438,7 +2465,7 @@ async def backup_create(interaction: discord.Interaction):
 
 
 @backup.command(name="list", description="Affiche les backups du serveur")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def backup_list(interaction: discord.Interaction):
     backups = load_backups()
     gid = str(interaction.guild.id)
@@ -2463,7 +2490,7 @@ async def backup_list(interaction: discord.Interaction):
 
 @backup.command(name="restore", description="Restaurer une backup du serveur")
 @app_commands.describe(backup_id="L'ID de la backup à restaurer")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def backup_restore(interaction: discord.Interaction, backup_id: str):
     backups = load_backups()
     gid = str(interaction.guild.id)
@@ -2543,7 +2570,7 @@ async def backup_restore(interaction: discord.Interaction, backup_id: str):
 
 @backup.command(name="delete", description="Supprimer une backup")
 @app_commands.describe(backup_id="L'ID de la backup à supprimer")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def backup_delete(interaction: discord.Interaction, backup_id: str):
     backups = load_backups()
     gid = str(interaction.guild.id)
@@ -2595,7 +2622,7 @@ def save_ticket_config(guild_id, config):
 
 
 @ticket.command(name="config", description="Panel de configuration des tickets")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def ticket_config(interaction: discord.Interaction):
     config = get_ticket_config(interaction.guild.id)
     settings = load_settings()
@@ -2679,7 +2706,7 @@ async def ticket_config(interaction: discord.Interaction):
     app_commands.Choice(name="remove", value="remove"),
     app_commands.Choice(name="reset", value="reset"),
 ])
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def ticket_types(
     interaction: discord.Interaction,
     action: str,
@@ -2743,7 +2770,7 @@ async def ticket_types(
 
 
 @ticket.command(name="panel", description="Envoie le panel de tickets")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def ticket_panel(interaction: discord.Interaction):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -2897,7 +2924,7 @@ async def handle_ticket_open(interaction: discord.Interaction, ticket_type: str,
 
 
 @ticket.command(name="setup", description="Setup complet du système de tickets")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def ticket_setup(interaction: discord.Interaction):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -2962,7 +2989,7 @@ async def ticket_setup(interaction: discord.Interaction):
 
 
 @config.command(name="ticket-channel", description="Définir le canal de tickets")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def set_ticket_channel(interaction: discord.Interaction, channel: discord.TextChannel):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -3049,7 +3076,7 @@ async def ticket_remove(interaction: discord.Interaction, member: discord.Member
 
 
 @ticket.command(name="list", description="Liste tous les tickets")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def tickets_list(interaction: discord.Interaction):
     tickets = load_tickets()
     gid = str(interaction.guild.id)
@@ -3089,7 +3116,7 @@ async def tickets_list(interaction: discord.Interaction):
 
 
 @ticket.command(name="transcript", description="Génère un transcript du ticket")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def ticket_transcript(interaction: discord.Interaction):
     if not interaction.channel.name.startswith("ticket-"):
         await interaction.response.send_message("Ce n'est pas un salon de ticket.", ephemeral=True)
@@ -3109,7 +3136,7 @@ async def ticket_transcript(interaction: discord.Interaction):
 
 @ticket.command(name="force-close", description="Ferme forcé un ticket par ID")
 @app_commands.describe(channel_id="ID du salon ticket")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def ticket_force_close(interaction: discord.Interaction, channel_id: str):
     tickets = load_tickets()
     gid = str(interaction.guild.id)
@@ -3221,7 +3248,7 @@ JAIL_ROLE_NAME = "Jailed"
 
 @mod.command(name="jail", description="Envoie un membre en prison (ou le libère)")
 @app_commands.describe(member="Le membre")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def jail(interaction: discord.Interaction, member: discord.Member):
     if member.bot:
         await interaction.response.send_message("Impossible de jailer un bot.", ephemeral=True)
@@ -3288,7 +3315,7 @@ async def jail(interaction: discord.Interaction, member: discord.Member):
 
 @mod.command(name="history", description="Affiche l'historique de modération d'un membre")
 @app_commands.describe(member="Le membre")
-@app_commands.checks.has_permissions(moderate_members=True)
+@mod_or_owner()
 async def history(interaction: discord.Interaction, member: discord.Member):
     mod_log = load_mod_log()
     gid = str(interaction.guild.id)
@@ -3313,7 +3340,7 @@ async def history(interaction: discord.Interaction, member: discord.Member):
     await interaction.response.send_message(view=view)
 
 
-@app_commands.checks.has_permissions(moderate_members=True)
+@mod_or_owner()
 @mod.command(name="case", description="Affiche un case de modération")
 @app_commands.describe(case_id="Numéro du case")
 async def case_cmd(interaction: discord.Interaction, case_id: int):
@@ -3364,7 +3391,7 @@ async def case_cmd(interaction: discord.Interaction, case_id: int):
     app_commands.Choice(name="on", value="on"),
     app_commands.Choice(name="off", value="off"),
 ])
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def welcome_setup(interaction: discord.Interaction, action: str, channel: discord.TextChannel = None, message: str = "Bienvenue {user} sur **{server}** !", image: str = "on"):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -3418,7 +3445,7 @@ async def welcome_setup(interaction: discord.Interaction, action: str, channel: 
     app_commands.Choice(name="on", value="on"),
     app_commands.Choice(name="off", value="off"),
 ])
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def goodbye(interaction: discord.Interaction, action: str, channel: discord.TextChannel = None, message: str = "**{user}** a quitté **{server}**.", image: str = "on"):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -3472,7 +3499,7 @@ async def goodbye(interaction: discord.Interaction, action: str, channel: discor
     app_commands.Choice(name="on", value="on"),
     app_commands.Choice(name="off", value="off"),
 ])
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def boost(interaction: discord.Interaction, action: str, channel: discord.TextChannel = None, message: str = "**{user}** a boosté **{server}** !", image: str = "on"):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -3531,7 +3558,7 @@ user_message_cache = defaultdict(list)
     app_commands.Choice(name="on", value="on"),
     app_commands.Choice(name="off", value="off"),
 ])
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def automod(interaction: discord.Interaction, option: str, state: str):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -3545,7 +3572,7 @@ async def automod(interaction: discord.Interaction, option: str, state: str):
 
 @mod.command(name="mod-log", description="Configure le salon de logs de modération")
 @app_commands.describe(channel="Le salon de logs")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def mod_log_cmd(interaction: discord.Interaction, channel: discord.TextChannel):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -3896,7 +3923,7 @@ async def handle_raid_action(member, config, reasons, score):
     ],
     anti_nuke=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
 )
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int = 5, window: int = 10, min_age: int = 7, action: str = "kick", score_kick: int = 10, score_ban: int = 20, anti_nuke: str = "on"):
     gid = str(interaction.guild.id)
     save_raid_config(gid, {
@@ -3924,7 +3951,7 @@ async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int
 
 @raid.command(name="log", description="Configure le salon de logs anti-raid")
 @app_commands.describe(channel="Le salon de logs")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def raid_log(interaction: discord.Interaction, channel: discord.TextChannel):
     gid = str(interaction.guild.id)
     save_raid_config(gid, {"raid_log": channel.id})
@@ -3937,7 +3964,7 @@ async def raid_log(interaction: discord.Interaction, channel: discord.TextChanne
     app_commands.Choice(name="ajouter", value="add"),
     app_commands.Choice(name="retirer", value="remove"),
 ])
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def raid_whitelist(interaction: discord.Interaction, role: discord.Role, action: str):
     gid = str(interaction.guild.id)
     config = get_raid_config(gid)
@@ -3964,7 +3991,7 @@ async def raid_whitelist(interaction: discord.Interaction, role: discord.Role, a
     app_commands.Choice(name="ajouter", value="add"),
     app_commands.Choice(name="retirer", value="remove"),
 ])
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def raid_blacklist(interaction: discord.Interaction, user_id: str, action: str):
     gid = str(interaction.guild.id)
     config = get_raid_config(gid)
@@ -3992,7 +4019,7 @@ async def raid_blacklist(interaction: discord.Interaction, user_id: str, action:
     app_commands.Choice(name="lock", value="lock"),
     app_commands.Choice(name="unlock", value="unlock"),
 ])
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def raid_lockdown(interaction: discord.Interaction, state: str):
     gid = str(interaction.guild.id)
     guild = interaction.guild
@@ -4050,7 +4077,7 @@ async def raid_massban(interaction: discord.Interaction, reason: str = "Anti-rai
 
 
 @raid.command(name="scan", description="Scanner les membres actuels pour detects les suspects")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def raid_scan(interaction: discord.Interaction):
     await interaction.response.defer()
     gid = str(interaction.guild.id)
@@ -4086,7 +4113,7 @@ async def raid_scan(interaction: discord.Interaction):
 
 
 @raid.command(name="status", description="Affiche la configuration anti-raid")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def raid_status(interaction: discord.Interaction):
     gid = str(interaction.guild.id)
     config = get_raid_config(gid)
@@ -4112,7 +4139,7 @@ async def raid_status(interaction: discord.Interaction):
 
 
 @raid.command(name="panel", description="Panel interactif anti-raid")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def raid_panel(interaction: discord.Interaction):
     gid = str(interaction.guild.id)
     config = get_raid_config(gid)
@@ -4763,7 +4790,7 @@ class WelcomePanel(discord.ui.LayoutView):
 
 
 @welcome.command(name="panel", description="Panel de configuration de l'accueil")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def welcome_panel(interaction: discord.Interaction):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -4773,7 +4800,7 @@ async def welcome_panel(interaction: discord.Interaction):
 
 # --- GOODBYE PANEL ---
 @welcome.command(name="goodbye-panel", description="Panel de configuration du départ")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def goodbye_panel(interaction: discord.Interaction):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -4799,7 +4826,7 @@ async def goodbye_panel(interaction: discord.Interaction):
 
 # --- BOOST PANEL ---
 @welcome.command(name="boost-panel", description="Panel de configuration des boosts")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def boost_panel(interaction: discord.Interaction):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -4825,7 +4852,7 @@ async def boost_panel(interaction: discord.Interaction):
 
 # --- MOD PANEL ---
 @config.command(name="mod-panel", description="Panel de modération rapide")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def mod_panel(interaction: discord.Interaction):
     settings = load_settings()
     gid = str(interaction.guild.id)
@@ -4952,13 +4979,13 @@ class ReglementModal(discord.ui.Modal, title="Configuration du Reglement"):
 
 
 @config.command(name="reglement", description="Configurer le systeme de reglement (ouvre un formulaire)")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def reglement_config(interaction: discord.Interaction):
     await interaction.response.send_modal(ReglementModal())
 
 
 @config.command(name="reglement-post", description="Poster le panel de reglement")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def reglement_post(interaction: discord.Interaction):
     gid = str(interaction.guild.id)
     settings = load_settings()
@@ -5058,7 +5085,7 @@ async def reglement_post(interaction: discord.Interaction):
 
 # --- AI PANEL ---
 @ai.command(name="panel", description="Panel de configuration de l'IA")
-@app_commands.checks.has_permissions(administrator=True)
+@admin_or_owner()
 async def ai_panel(interaction: discord.Interaction):
     settings = load_settings()
     gid = str(interaction.guild.id)
