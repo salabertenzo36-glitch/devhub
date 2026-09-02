@@ -17,7 +17,7 @@ from config import TOKEN
 
 BOT_START = datetime.now(timezone.utc)
 
-class EOFBot(commands.Bot):
+class DevHubBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
@@ -74,7 +74,7 @@ class PersistentTicketClose(discord.ui.LayoutView):
         self.add_item(container)
 
 
-bot = EOFBot()
+bot = DevHubBot()
 
 ROLES_PER_PAGE = 15
 TICKETS_FILE = "tickets.json"
@@ -411,13 +411,24 @@ async def on_ready():
     print(f"▸ {bot.user.name} connecté")
     print(f"▸ Serveurs : {len(bot.guilds)}")
 
-    activity = discord.Activity(type=discord.ActivityType.playing, name="EOF Bot")
+    total_members = sum(g.member_count or 0 for g in bot.guilds)
+    activity = discord.Streaming(
+        name=f"Dev Hub — {len(bot.guilds)} serveurs | {total_members} membres",
+        url="https://www.twitch.tv/devhub"
+    )
     await bot.change_presence(activity=activity, status=discord.Status.online)
 
 
 @bot.event
 async def on_guild_join(guild: discord.Guild):
     print(f"▸ Ajouté à {guild.name} ({guild.id}) — {guild.member_count} membres")
+
+    total_members = sum(g.member_count or 0 for g in bot.guilds)
+    activity = discord.Streaming(
+        name=f"Dev Hub — {len(bot.guilds)} serveurs | {total_members} membres",
+        url="https://www.twitch.tv/devhub"
+    )
+    await bot.change_presence(activity=activity, status=discord.Status.online)
 
     channel = bot.get_channel(1544098981670289530)
     if channel:
@@ -440,6 +451,17 @@ async def on_guild_join(guild: discord.Guild):
             await channel.send(view=view)
         except discord.Forbidden:
             pass
+
+
+@bot.event
+async def on_guild_remove(guild: discord.Guild):
+    print(f"▸ Retiré de {guild.name} ({guild.id})")
+    total_members = sum(g.member_count or 0 for g in bot.guilds)
+    activity = discord.Streaming(
+        name=f"Dev Hub — {len(bot.guilds)} serveurs | {total_members} membres",
+        url="https://www.twitch.tv/devhub"
+    )
+    await bot.change_presence(activity=activity, status=discord.Status.online)
 
 
 @bot.event
