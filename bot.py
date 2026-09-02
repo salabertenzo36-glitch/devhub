@@ -1340,7 +1340,7 @@ async def poll(interaction: discord.Interaction, question: str, option1: str, op
 HELP_CATEGORIES = {
     "mod": {
         "label": "Modération",
-        "emoji": "<:moderation:1544375833374752789>",
+        "emoji": "<:7964modbadgewhite:1544381242705846302>",
         "commands": [
             "`/mod warn` — Avertir un membre",
             "`/mod warnings` — Affiche les warns",
@@ -1362,7 +1362,7 @@ HELP_CATEGORIES = {
     },
     "config": {
         "label": "Configuration",
-        "emoji": "<:mod_avancee:1544375800248402003>",
+        "emoji": "<:56644tools:1544381257264140328>",
         "commands": [
             "`/config staff-roles` — Roles staff",
             "`/config ticket-channel` — Canal de tickets",
@@ -1375,7 +1375,7 @@ HELP_CATEGORIES = {
     },
     "welcome": {
         "label": "Welcome & Goodbye",
-        "emoji": "<:welcome:1544361439785910424>",
+        "emoji": "<:1882megaphone:1544381218932654143>",
         "commands": [
             "`/welcome setup` — Configurer l'accueil",
             "`/welcome disable` — Désactiver l'accueil",
@@ -1390,7 +1390,7 @@ HELP_CATEGORIES = {
     },
     "ticket": {
         "label": "Tickets",
-        "emoji": "<:tickets:1544361426553016411>",
+        "emoji": "<:9891chaticon:1544381248246513694>",
         "commands": [
             "`/ticket setup` — Setup complet",
             "`/ticket panel` — Envoyer le panel",
@@ -1406,7 +1406,7 @@ HELP_CATEGORIES = {
     },
     "music": {
         "label": "Musique",
-        "emoji": "🎵",
+        "emoji": "<:9183shoppingcart:1544381246854008922>",
         "commands": [
             "`/music play` — Jouer une musique",
             "`/music pause` — Pause",
@@ -1421,7 +1421,7 @@ HELP_CATEGORIES = {
     },
     "util": {
         "label": "Utilitaires",
-        "emoji": "<:utilitaires:1544361431053373600>",
+        "emoji": "<:10447information:1544381249550942429>",
         "commands": [
             "`/util ping` — Latence",
             "`/util uptime` — Temps de fonctionnement",
@@ -1447,7 +1447,7 @@ HELP_CATEGORIES = {
     },
     "fun": {
         "label": "Fun",
-        "emoji": "<:fun:1544375699195043990>",
+        "emoji": "<:75645star:1544381263517843556>",
         "commands": [
             "`/fun coinflip` — Pile ou face",
             "`/fun dice` — Lancer de dé",
@@ -1458,7 +1458,7 @@ HELP_CATEGORIES = {
     },
     "backup": {
         "label": "Backup",
-        "emoji": "💾",
+        "emoji": "<:2577whitenitroboost:1544381220220182589>",
         "commands": [
             "`/backup create` — Créer une backup",
             "`/backup list` — Liste les backups",
@@ -1468,7 +1468,7 @@ HELP_CATEGORIES = {
     },
     "stats": {
         "label": "Statistiques",
-        "emoji": "<:stats:1544361414079021177>",
+        "emoji": "<:10845currency:1544381252105277521>",
         "commands": [
             "`/stats user` — Stats d'un membre",
             "`/stats server` — Stats du serveur",
@@ -1476,7 +1476,7 @@ HELP_CATEGORIES = {
     },
     "raid": {
         "label": "Anti-raid",
-        "emoji": "<:automod:1544375572266885170>",
+        "emoji": "<:84795adminicon:1544381268295417917>",
         "commands": [
             "`/raid config` — Configurer l'anti-raid intelligent",
             "`/raid log` — Salon de logs",
@@ -1491,14 +1491,14 @@ HELP_CATEGORIES = {
     },
     "ghostping": {
         "label": "Ghostping",
-        "emoji": "<:ghostping:1544375729980969150>",
+        "emoji": "<:1569whitepin:1544381217657323560>",
         "commands": [
             "`/ghostping send` — Ghostping un salon",
         ]
     },
     "ai": {
         "label": "IA Insolente",
-        "emoji": "🤖",
+        "emoji": "<:56832developer:1544381258543534150>",
         "commands": [
             "`/ai panel` — Panel de configuration",
         ]
@@ -1508,13 +1508,13 @@ HELP_CATEGORIES = {
 
 EMOJI_FALLBACKS = {
     "mod": "🔨",
-    "mod_avancee": "🛡️",
+    "config": "🔧",
     "welcome": "📢",
-    "tickets": "💬",
-    "utilitaires": "🔧",
+    "ticket": "💬",
+    "util": "🔧",
     "fun": "⭐",
     "stats": "📊",
-    "automod": "🤖",
+    "raid": "🤖",
     "ghostping": "👻",
     "music": "🎵",
     "backup": "💾",
