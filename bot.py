@@ -765,6 +765,52 @@ async def on_interaction(interaction: discord.Interaction):
             save_settings(settings)
             await interaction.response.send_message("😴 IA désactivée.", ephemeral=True)
 
+    # --- TICKET CONFIG BUTTONS ---
+    elif cid in ("tc_title", "tc_desc", "tc_color", "tc_category", "tc_logs", "tc_limit", "tc_welcome", "tc_close_msg"):
+        gid = str(interaction.guild.id) if interaction.guild else None
+        if not gid:
+            return
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Permission requise : Administrateur.", ephemeral=True)
+            return
+
+        if cid == "tc_title":
+            modal = discord.ui.Modal(title="Titre du panel", custom_id="tc_title_modal")
+            modal.add_item(discord.ui.TextInput(label="Titre", placeholder="Support", default=get_ticket_config(interaction.guild.id).get("panel_title", "Support")))
+            await interaction.response.send_modal(modal)
+        elif cid == "tc_desc":
+            modal = discord.ui.Modal(title="Description du panel", custom_id="tc_desc_modal")
+            modal.add_item(discord.ui.TextInput(label="Description", placeholder="Besoin d'aide ?", style=discord.TextStyle.paragraph, default=get_ticket_config(interaction.guild.id).get("panel_desc", "")))
+            await interaction.response.send_modal(modal)
+        elif cid == "tc_color":
+            modal = discord.ui.Modal(title="Couleur hex", custom_id="tc_color_modal")
+            current_color = get_ticket_config(interaction.guild.id).get("panel_color")
+            hex_str = f"#{current_color:06x}" if current_color else "#b0b8c4"
+            modal.add_item(discord.ui.TextInput(label="Couleur (hex)", placeholder="#b0b8c4", default=hex_str))
+            await interaction.response.send_modal(modal)
+        elif cid == "tc_category":
+            modal = discord.ui.Modal(title="Catégorie des tickets", custom_id="tc_category_modal")
+            current_cat = get_ticket_config(interaction.guild.id).get("ticket_category", "")
+            modal.add_item(discord.ui.TextInput(label="ID de la catégorie", placeholder="123456789012345678", default=str(current_cat) if current_cat else ""))
+            await interaction.response.send_modal(modal)
+        elif cid == "tc_logs":
+            modal = discord.ui.Modal(title="Salon des logs", custom_id="tc_logs_modal")
+            current_log = get_ticket_config(interaction.guild.id).get("ticket_log_channel", "")
+            modal.add_item(discord.ui.TextInput(label="ID du salon logs", placeholder="123456789012345678", default=str(current_log) if current_log else ""))
+            await interaction.response.send_modal(modal)
+        elif cid == "tc_limit":
+            modal = discord.ui.Modal(title="Limite de tickets", custom_id="tc_limit_modal")
+            modal.add_item(discord.ui.TextInput(label="Nombre max (0 = illimité)", placeholder="1", default=str(get_ticket_config(interaction.guild.id).get("ticket_limit", 1))))
+            await interaction.response.send_modal(modal)
+        elif cid == "tc_welcome":
+            modal = discord.ui.Modal(title="Message d'accueil", custom_id="tc_welcome_modal")
+            modal.add_item(discord.ui.TextInput(label="Message", placeholder="Décrivez votre demande...", style=discord.TextStyle.paragraph, default=get_ticket_config(interaction.guild.id).get("welcome_msg", "")[:100]))
+            await interaction.response.send_modal(modal)
+        elif cid == "tc_close_msg":
+            modal = discord.ui.Modal(title="Message de fermeture", custom_id="tc_close_msg_modal")
+            modal.add_item(discord.ui.TextInput(label="Message", placeholder="Ticket fermé.", style=discord.TextStyle.paragraph, default=get_ticket_config(interaction.guild.id).get("close_msg", "")[:100]))
+            await interaction.response.send_modal(modal)
+
     # --- RAID PANEL BUTTONS ---
     elif cid in ("raid_on", "raid_off", "raid_lockdown", "raid_scan", "raid_massban"):
         gid = str(interaction.guild.id) if interaction.guild else None
@@ -935,6 +981,73 @@ async def on_interaction(interaction: discord.Interaction):
             except ValueError:
                 pass
             await interaction.response.send_message("Salon introuvable.", ephemeral=True)
+
+        # --- TICKET CONFIG MODALS ---
+        elif cid == "tc_title_modal":
+            config = get_ticket_config(interaction.guild.id)
+            config["panel_title"] = value
+            save_ticket_config(interaction.guild.id, config)
+            await interaction.response.send_message(f"Titre mis à jour : **{value}**", ephemeral=True)
+        elif cid == "tc_desc_modal":
+            config = get_ticket_config(interaction.guild.id)
+            config["panel_desc"] = value
+            save_ticket_config(interaction.guild.id, config)
+            await interaction.response.send_message(f"Description mise à jour.", ephemeral=True)
+        elif cid == "tc_color_modal":
+            config = get_ticket_config(interaction.guild.id)
+            try:
+                color_int = int(value.replace("#", ""), 16)
+                config["panel_color"] = color_int
+                save_ticket_config(interaction.guild.id, config)
+                await interaction.response.send_message(f"Couleur mise à jour : `{value}`", ephemeral=True)
+            except ValueError:
+                await interaction.response.send_message("Couleur invalide. Format : `#b0b8c4`", ephemeral=True)
+        elif cid == "tc_category_modal":
+            config = get_ticket_config(interaction.guild.id)
+            try:
+                cat_id = int(value)
+                cat = interaction.guild.get_channel(cat_id)
+                if not cat or not isinstance(cat, discord.CategoryChannel):
+                    await interaction.response.send_message("Catégorie introuvable.", ephemeral=True)
+                    return
+                config["ticket_category"] = cat_id
+                save_ticket_config(interaction.guild.id, config)
+                await interaction.response.send_message(f"Catégorie mise à jour : {cat.mention}", ephemeral=True)
+            except ValueError:
+                await interaction.response.send_message("ID invalide.", ephemeral=True)
+        elif cid == "tc_logs_modal":
+            config = get_ticket_config(interaction.guild.id)
+            try:
+                ch_id = int(value)
+                ch = interaction.guild.get_channel(ch_id)
+                if not ch:
+                    await interaction.response.send_message("Salon introuvable.", ephemeral=True)
+                    return
+                config["ticket_log_channel"] = ch_id
+                save_ticket_config(interaction.guild.id, config)
+                await interaction.response.send_message(f"Salon logs mis à jour : {ch.mention}", ephemeral=True)
+            except ValueError:
+                await interaction.response.send_message("ID invalide.", ephemeral=True)
+        elif cid == "tc_limit_modal":
+            config = get_ticket_config(interaction.guild.id)
+            try:
+                limit = int(value)
+                config["ticket_limit"] = max(0, limit)
+                save_ticket_config(interaction.guild.id, config)
+                text = f"`{limit}`" if limit > 0 else "`Illimité`"
+                await interaction.response.send_message(f"Limite mise à jour : {text}", ephemeral=True)
+            except ValueError:
+                await interaction.response.send_message("Nombre invalide.", ephemeral=True)
+        elif cid == "tc_welcome_modal":
+            config = get_ticket_config(interaction.guild.id)
+            config["welcome_msg"] = value
+            save_ticket_config(interaction.guild.id, config)
+            await interaction.response.send_message("Message d'accueil mis à jour.", ephemeral=True)
+        elif cid == "tc_close_msg_modal":
+            config = get_ticket_config(interaction.guild.id)
+            config["close_msg"] = value
+            save_ticket_config(interaction.guild.id, config)
+            await interaction.response.send_message("Message de fermeture mis à jour.", ephemeral=True)
 
         # --- TICKET: ADD MEMBER MODAL ---
         elif cid.startswith("ticket_add_modal_"):
@@ -2332,84 +2445,51 @@ def save_ticket_config(guild_id, config):
     save_settings(settings)
 
 
-@ticket.command(name="config", description="Configurer le système de tickets")
-@app_commands.describe(
-    titre="Titre du panel de tickets",
-    description="Description du panel",
-    couleur="Couleur hex du panel (ex: #b0b8c4)",
-    categorie="Catégorie où créer les tickets",
-    salon_logs="Salon pour les transcripts",
-    message_accueil="Message d'accueil dans le ticket",
-    message_fermeture="Message de fermeture",
-    limite="Limite de tickets ouverts par membre (0 = illimité)"
-)
+@ticket.command(name="config", description="Panel de configuration des tickets")
 @app_commands.checks.has_permissions(administrator=True)
-async def ticket_config(
-    interaction: discord.Interaction,
-    titre: str = None,
-    description: str = None,
-    couleur: str = None,
-    categorie: discord.CategoryChannel = None,
-    salon_logs: discord.TextChannel = None,
-    message_accueil: str = None,
-    message_fermeture: str = None,
-    limite: int = None
-):
+async def ticket_config(interaction: discord.Interaction):
     config = get_ticket_config(interaction.guild.id)
-    changes = []
 
-    if titre is not None:
-        config["panel_title"] = titre
-        changes.append(f"**Titre** → {titre}")
-    if description is not None:
-        config["panel_desc"] = description
-        changes.append(f"**Description** → {description}")
-    if couleur is not None:
-        try:
-            color_int = int(couleur.replace("#", ""), 16)
-            config["panel_color"] = color_int
-            changes.append(f"**Couleur** → {couleur}")
-        except ValueError:
-            await interaction.response.send_message("Couleur invalide. Utilisez le format hex (ex: `#b0b8c4`).", ephemeral=True)
-            return
-    if categorie is not None:
-        config["ticket_category"] = categorie.id
-        changes.append(f"**Catégorie** → {categorie.mention}")
-    if salon_logs is not None:
-        config["ticket_log_channel"] = salon_logs.id
-        changes.append(f"**Salon logs** → {salon_logs.mention}")
-    if message_accueil is not None:
-        config["welcome_msg"] = message_accueil
-        changes.append(f"**Message accueil** → {message_accueil[:50]}...")
-    if message_fermeture is not None:
-        config["close_msg"] = message_fermeture
-        changes.append(f"**Message fermeture** → {message_fermeture[:50]}...")
-    if limite is not None:
-        config["ticket_limit"] = limite
-        changes.append(f"**Limite** → {limite if limite > 0 else 'Illimité'}")
+    cat_text = f"<#{config['ticket_category']}>" if config.get("ticket_category") else "`Non définie`"
+    log_text = f"<#{config['ticket_log_channel']}>" if config.get("ticket_log_channel") else "`Non défini`"
 
-    if not changes:
-        config_view = view_text(
-            "## Configuration Tickets",
-            f"**Titre** `{config.get('panel_title', 'Support')}`",
-            f"**Description** `{config.get('panel_desc', 'Non défini')}`",
-            f"**Couleur** `{config.get('panel_color', 'Défaut')}`",
-            f"**Catégorie** `<#{config.get('ticket_channel', 0)}>`" if config.get('ticket_category') else "**Catégorie** `Non définie`",
-            f"**Salon logs** `<#{config.get('ticket_log_channel', 0)}>`" if config.get('ticket_log_channel') else "**Salon logs** `Non défini`",
-            f"**Message accueil** `{config.get('welcome_msg', 'Non défini')[:80]}`",
-            f"**Message fermeture** `{config.get('close_msg', 'Non défini')[:80]}`",
-            f"**Limite** `{config.get('ticket_limit', 1)}`",
-            "",
-            "Utilisez les paramètres pour modifier."
-        )
-        await interaction.response.send_message(view=config_view, ephemeral=True)
-        return
+    view = discord.ui.LayoutView(timeout=120)
+    container = discord.ui.Container(accent_colour=11581636)
+    container.add_item(discord.ui.TextDisplay("## Configuration Tickets"))
+    container.add_item(discord.ui.Separator())
 
-    save_ticket_config(interaction.guild.id, config)
-    await interaction.response.send_message(
-        "Configuration mise à jour :\n" + "\n".join(changes),
-        ephemeral=True
+    current = (
+        f"**Titre** `{config.get('panel_title', 'Support')}`\n"
+        f"**Description** `{config.get('panel_desc', 'Non défini')[:60]}`\n"
+        f"**Couleur** `{config.get('panel_color', 'Défaut')}`\n"
+        f"**Catégorie** {cat_text}\n"
+        f"**Salon logs** {log_text}\n"
+        f"**Message accueil** `{config.get('welcome_msg', 'Non défini')[:60]}`\n"
+        f"**Message fermeture** `{config.get('close_msg', 'Non défini')[:60]}`\n"
+        f"**Limite tickets** `{config.get('ticket_limit', 1)}`"
     )
+    container.add_item(discord.ui.TextDisplay(current))
+    container.add_item(discord.ui.Separator())
+
+    row1 = discord.ui.ActionRow()
+    row1.add_item(discord.ui.Button(label="Titre", style=discord.ButtonStyle.primary, custom_id="tc_title"))
+    row1.add_item(discord.ui.Button(label="Description", style=discord.ButtonStyle.primary, custom_id="tc_desc"))
+    row1.add_item(discord.ui.Button(label="Couleur", style=discord.ButtonStyle.primary, custom_id="tc_color"))
+    container.add_item(row1)
+
+    row2 = discord.ui.ActionRow()
+    row2.add_item(discord.ui.Button(label="Catégorie", style=discord.ButtonStyle.secondary, custom_id="tc_category"))
+    row2.add_item(discord.ui.Button(label="Salon logs", style=discord.ButtonStyle.secondary, custom_id="tc_logs"))
+    row2.add_item(discord.ui.Button(label="Limite", style=discord.ButtonStyle.secondary, custom_id="tc_limit"))
+    container.add_item(row2)
+
+    row3 = discord.ui.ActionRow()
+    row3.add_item(discord.ui.Button(label="Message accueil", style=discord.ButtonStyle.secondary, custom_id="tc_welcome"))
+    row3.add_item(discord.ui.Button(label="Message fermeture", style=discord.ButtonStyle.secondary, custom_id="tc_close_msg"))
+    container.add_item(row3)
+
+    view.add_item(container)
+    await interaction.response.send_message(view=view, ephemeral=True)
 
 
 @ticket.command(name="types", description="Gérer les types de tickets")
