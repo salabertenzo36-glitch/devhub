@@ -4671,7 +4671,7 @@ AI_RANDOM = [
 async def get_ai_response(message_content, user_name):
     try:
         import g4f
-        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n\nCommandes naturelles: Tu peux executer des actions en langage naturel via les mentions. Par exemple: \"mute @user\" mute le membre, \"ban @user\" le bannit, \"kick @user\" l'expulse, \"warn @user\" l'avertit, \"jail @user\" l'incarcere, \"envoie hello #channel\" envoie un message.\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-spam, anti-link (detecte discord.gg, dsc.gg, t.me), verification gate, lockdown.\nDonnees: MongoDB Atlas (pas de JSON).\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
+        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n\nCommandes naturelles: Tu peux executer des actions en langage naturel via les mentions. Par exemple: \"mute @user\" mute le membre, \"ban @user\" le bannit, \"kick @user\" l'expulse, \"warn @user\" l'avertit, \"unwarn @user\" supprime ses warns, \"jail @user\" l'incarcere, \"unjail @user\" le libere, \"unban @user\" le débannit, \"envoie hello #channel\" envoie un message.\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-spam, anti-link (detecte discord.gg, dsc.gg, t.me), verification gate, lockdown.\nDonnees: MongoDB Atlas (pas de JSON).\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
         response = g4f.ChatCompletion.create(
             model=g4f.models.gpt_4,
             messages=[
@@ -4697,17 +4697,19 @@ ACTION_KEYWORDS = {
     "unmute":  ["unmute", "démute", "demute", "peux parler", "parle", "retire le mute", "enleve le mute"],
     "kick":    ["kick", "kicke", "vire", "viré", "expulse", "expulser", "degage", "dégage", "sort", "sors", "fait partir", "va t'en", "va dehors"],
     "ban":     ["ban", "bannis", "banir", "banish", "perma", "ban def", "ban permanent", "détruit", "supprime"],
-    "unban":   ["unban", "débannis", "debannis", "retire le ban", "enleve le ban"],
+    "unban":   ["unban", "débannis", "debannis", "retire le ban", "enleve le ban", "débanis"],
     "softban": ["softban", "soft ban", "ban temp", "ban temporaire"],
     "warn":    ["warn", "avertis", "avertir", "attention", "premier avertissement", "strike", "strike"],
+    "unwarn":  ["unwarn", "déavertis", "déavertir", "retire le avertissement", "enleve le avertissement", "clearwarns", "clear warns", "supprime les warns"],
     "jail":    ["jail", "jailer", "prison", "incarcere", "incarcérer", "met en prison", "enferme"],
+    "unjail":  ["unjail", "déjailer", "déjail", "libere", "libérer", "sort de prison", "retire de prison", "enleve de prison"],
     "say":     ["envoie", "envoyer", "envoye", "dit", "dis", "write", "send", "message"],
 }
 
 ACTION_MAP = {
     "mute": "mute", "unmute": "unmute", "kick": "kick", "ban": "ban",
-    "unban": "unban", "softban": "softban", "warn": "warn", "jail": "jail",
-    "timeout": "mute", "say": "say",
+    "unban": "unban", "softban": "softban", "warn": "warn", "unwarn": "unwarn",
+    "jail": "jail", "unjail": "unjail", "timeout": "mute", "say": "say",
 }
 
 
@@ -4973,6 +4975,38 @@ async def execute_natural_command(message, parsed):
         await member.edit(roles=[], reason="Jail")
         await message.channel.send(f"**{member.display_name}** jail — {reason}", delete_after=8)
         await log_mod(guild, "Jail", message.author, member, reason)
+
+    elif action == "unjail":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        jail_data = load_jail()
+        gid = str(guild.id)
+        uid = str(target_id)
+        if gid in jail_data and uid in jail_data[gid]:
+            saved_roles = jail_data[gid][uid].get("roles", [])
+            await member.edit(roles=[guild.get_role(rid) for rid in saved_roles if guild.get_role(rid)], reason="Unjail")
+            del jail_data[gid][uid]
+            save_jail(jail_data)
+            await message.channel.send(f"**{member.display_name}** unjail — {reason}", delete_after=8)
+            await log_mod(guild, "Unjail", message.author, member, reason)
+        else:
+            await message.channel.send("Membre pas en prison.", delete_after=5)
+
+    elif action == "unwarn":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        warns = load_warns()
+        gid = str(guild.id)
+        uid = str(target_id)
+        if gid in warns and uid in warns[gid] and warns[gid][uid]:
+            warns[gid][uid].clear()
+            save_warns(warns)
+            await message.channel.send(f"**{member.display_name}** warns supprimés.", delete_after=8)
+            await log_mod(guild, "Unwarn (clear)", message.author, member, reason)
+        else:
+            await message.channel.send("Aucun warn à supprimer.", delete_after=5)
 
     elif action == "unban":
         try:
