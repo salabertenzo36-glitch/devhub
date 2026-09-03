@@ -24,6 +24,7 @@ from db import (
     load_mod_log, save_mod_log,
     load_raid_state, save_raid_state,
     save_ticket_config, save_raid_config,
+    load_economy, save_economy,
 )
 from translations import t, get_lang, LANG_NAMES, LANG_FLAGS
 
@@ -4226,6 +4227,771 @@ async def raid_panel(interaction: discord.Interaction):
 
     view.add_item(container)
     await interaction.response.send_message(view=view, ephemeral=True)
+
+
+# ──────────────────────────────────────────────
+#  ECONOMY SYSTEM
+# ──────────────────────────────────────────────
+
+import random as _random
+import time as _time
+
+ECONOMY_SHOP = {
+    "laptop": {"price": 5000, "desc": "Ordinateur portable", "emoji": "💻"},
+    "phone": {"price": 2000, "desc": "Telephone", "emoji": "📱"},
+    "car": {"price": 50000, "desc": "Voiture", "emoji": "🚗"},
+    "house": {"price": 200000, "desc": "Maison", "emoji": "🏠"},
+    "yacht": {"price": 1000000, "desc": "Yacht de luxe", "emoji": "🛥️"},
+    "diamond": {"price": 15000, "desc": "Diamant precieux", "emoji": "💎"},
+    "gold_bar": {"price": 10000, "desc": "Barre d'or", "emoji": "🥇"},
+    "lucky_charm": {"price": 3000, "desc": "Porte-bonheur (+10% gains)", "emoji": "🍀"},
+    "shield": {"price": 8000, "desc": "Bouclier anti-vol", "emoji": "🛡️"},
+    "vpn": {"price": 4000, "desc": "VPN (protege du crime)", "emoji": "🔒"},
+    "work_boost": {"price": 7500, "desc": "Boost de travail (+50% salaire)", "emoji": "📈"},
+    "fishing_rod": {"price": 1500, "desc": "Canne a peche", "emoji": "🎣"},
+    "pickaxe": {"price": 2500, "desc": "Pioche (minage)", "emoji": "⛏️"},
+    "casino_pass": {"price": 10000, "desc": "Pass VIP casino", "emoji": "🎰"},
+}
+
+WORK_JOBS = [
+    ("Developpeur", 100, 500, "Tu as code un bot qui genere de l'argent... ironique."),
+    ("Livreur de pizza", 50, 300, "Tu as livre 12 pizzas sans en manger une seule."),
+    ("Streamateur", 200, 800, "3 viewers mais 0 donations. Courage."),
+    ("Mecanicien", 150, 450, "Tu as repare une voiture de.Zero."),
+    ("Cuisinier", 80, 350, "Le plat du jour : des raviolis instables."),
+    ("Professeur", 120, 400, "Tu as appris a des gamins que la Terre est plate."),
+    ("Voleur", 0, 1000, "Tu as vole... un sandwich. Pas terrible."),
+    ("Artiste", 60, 250, "Tu as peint un chef-d'oeuvre. Personne l'a achete."),
+    ("DJ", 100, 400, "Tu as mixe 3 morceaux. Le public etait 3 personnes."),
+    ("Pilote", 300, 900, "Tu as atterri sans crasher. Record personnel."),
+    ("Chasseur de tresors", 0, 1500, "Tu as trouve une bouteille. Elle etait vide."),
+    ("Influenceur", 50, 600, "Tu as poste une story. 2 likes. Ta mere inclus."),
+    ("Medecin", 200, 600, "Tu as soigne un rhume. Le patient est mort de stress."),
+    ("Detective", 150, 500, "Tu as resolu l'affaire. C'etait le majordome."),
+    ("Mineur", 100, 450, "Tu as mine 3 blocs de charbon. Professionnel."),
+]
+
+CRIME_ACTIONS = [
+    ("braquer une banque", 0.4, 5000, 2000, "Tu as braque la banque. Les caisses etaient vides."),
+    ("voler un vehicule", 0.5, 2000, 1000, "Tu as vole une voiture. C'etait une hotte de cuisine."),
+    ("arnaquer un joueur", 0.6, 1500, 800, "Tu as arnaque quelqu'un. Il etait plus arnaque que toi."),
+    ("cambrioler une maison", 0.45, 3000, 1500, "Tu as cambriole une maison. C'etait la tienne."),
+    ("pirater un site", 0.5, 2500, 1200, "Tu as pirate un site. Le CAPTCHA t'a arrete."),
+    ("vendre des weed", 0.3, 8000, 3000, "Tu as vendu... des herbes. De jardin."),
+    ("escroquerie en ligne", 0.55, 2000, 900, "Tu as escroque quelqu'un. C'etait un bot."),
+    ("vol a l'etage", 0.6, 1000, 500, "Tu as vole un magasin. Tu as pris un chewing-gum."),
+]
+
+SLOT_ITEMS = ["🍒", "🍋", "🍊", "🍇", "💎", "7️⃣", "🔔", "⭐"]
+
+FISHING_CATCHES = [
+    ("Poisson rouge", 50, 10),
+    ("Poisson-chat", 80, 15),
+    ("Bar", 120, 20),
+    ("Saumon", 200, 30),
+    ("Thon", 350, 45),
+    ("Requin", 500, 60),
+    ("Baleine", 1000, 100),
+    ("Bottes indestructibles", 100, 0),
+    ("Vieille chaussette", 5, 0),
+    ("Tresor", 5000, 200),
+    ("Diamant brut", 2000, 50),
+    ("Boucle d'oreille", 300, 25),
+]
+
+
+def get_economy(gid, uid):
+    eco = load_economy()
+    g = eco.get(gid, {})
+    if uid not in g:
+        g[uid] = {"wallet": 0, "bank": 0, "inventory": [], "daily": 0, "hourly": 0, "weekly": 0, "work": 0, "crime": 0, "rob": 0, "level": 1, "xp": 0, "title": ""}
+    eco[gid] = g
+    return eco, g[uid]
+
+
+def save_economy_data(eco):
+    save_economy(eco)
+
+
+economy = app_commands.Group(name="economy", description="Systeme d'economie")
+
+
+@economy.command(name="balance", description="Voir ton solde")
+@app_commands.describe(member="Membre a inspecter (optionnel)")
+async def eco_balance(interaction: discord.Interaction, member: discord.Member = None):
+    target = member or interaction.user
+    gid = str(interaction.guild.id)
+    uid = str(target.id)
+    eco, data = get_economy(gid, uid)
+    total = data["wallet"] + data["bank"]
+    level = data.get("level", 1)
+    xp = data.get("xp", 0)
+    title = data.get("title", "")
+
+    title_text = f" | {title}" if title else ""
+    view = view_text(
+        f"## Solde de {target.display_name}{title_text}",
+        f"**Porte-monnaie** `{data['wallet']:,}` pieces",
+        f"**Banque** `{data['bank']:,}` pieces",
+        f"**Total** `{total:,}` pieces",
+        f"**Niveau** `{level}` (XP: `{xp}`)",
+        f"**Objets** `{len(data.get('inventory', []))}` items",
+    )
+    await interaction.response.send_message(view=view)
+
+
+@economy.command(name="daily", description="Recupere ta recompense journaliere")
+async def eco_daily(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+    now = _time.time()
+    cooldown = 86400
+
+    if now - data.get("daily", 0) < cooldown:
+        remaining = cooldown - (now - data["daily"])
+        hours = int(remaining // 3600)
+        minutes = int((remaining % 3600) // 60)
+        await interaction.response.send_message(f"Tu dois attendre **{hours}h{minutes}m**.", ephemeral=True)
+        return
+
+    base = _random.randint(200, 500)
+    has_lucky = "lucky_charm" in data.get("inventory", [])
+    bonus = int(base * 0.1) if has_lucky else 0
+    total = base + bonus
+    data["daily"] = now
+    data["wallet"] += total
+    data["xp"] = data.get("xp", 0) + 10
+    save_economy_data(eco)
+
+    bonus_text = f" (+{bonus} bonus porte-bonheur)" if bonus else ""
+    await interaction.response.send_message(f"**Recompense journaliere** : `{total}` pieces{bonus_text}")
+
+
+@economy.command(name="hourly", description="Recupere ta recompense horaire")
+async def eco_hourly(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+    now = _time.time()
+    cooldown = 3600
+
+    if now - data.get("hourly", 0) < cooldown:
+        remaining = cooldown - (now - data["hourly"])
+        minutes = int(remaining // 60)
+        await interaction.response.send_message(f"Tu dois attendre **{minutes} minutes**.", ephemeral=True)
+        return
+
+    base = _random.randint(50, 150)
+    has_lucky = "lucky_charm" in data.get("inventory", [])
+    bonus = int(base * 0.1) if has_lucky else 0
+    total = base + bonus
+    data["hourly"] = now
+    data["wallet"] += total
+    data["xp"] = data.get("xp", 0) + 5
+    save_economy_data(eco)
+
+    bonus_text = f" (+{bonus} bonus)" if bonus else ""
+    await interaction.response.send_message(f"**Recompense horaire** : `{total}` pieces{bonus_text}")
+
+
+@economy.command(name="weekly", description="Recupere ta recompense hebdomadaire")
+async def eco_weekly(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+    now = _time.time()
+    cooldown = 604800
+
+    if now - data.get("weekly", 0) < cooldown:
+        remaining = cooldown - (now - data["weekly"])
+        days = int(remaining // 86400)
+        hours = int((remaining % 86400) // 3600)
+        await interaction.response.send_message(f"Tu dois attendre **{days}j {hours}h**.", ephemeral=True)
+        return
+
+    base = _random.randint(1000, 3000)
+    has_lucky = "lucky_charm" in data.get("inventory", [])
+    bonus = int(base * 0.1) if has_lucky else 0
+    total = base + bonus
+    data["weekly"] = now
+    data["wallet"] += total
+    data["xp"] = data.get("xp", 0) + 50
+    save_economy_data(eco)
+
+    bonus_text = f" (+{bonus} bonus)" if bonus else ""
+    await interaction.response.send_message(f"**Recompense hebdomadaire** : `{total}` pieces{bonus_text}")
+
+
+@economy.command(name="work", description="Travaille pour gagner des pieces")
+async def eco_work(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+    now = _time.time()
+    cooldown = 600
+
+    if now - data.get("work", 0) < cooldown:
+        remaining = cooldown - (now - data["work"])
+        minutes = int(remaining // 60)
+        await interaction.response.send_message(f"Tu dois attendre **{minutes} minutes**.", ephemeral=True)
+        return
+
+    job = _random.choice(WORK_JOBS)
+    name, min_pay, max_pay, desc = job
+    base = _random.randint(min_pay, max_pay)
+    has_boost = "work_boost" in data.get("inventory", [])
+    bonus = int(base * 0.5) if has_boost else 0
+    total = base + bonus
+    data["work"] = now
+    data["wallet"] += total
+    data["xp"] = data.get("xp", 0) + 15
+    save_economy_data(eco)
+
+    bonus_text = f" (+{bonus} boost)" if bonus else ""
+    await interaction.response.send_message(
+        f"**{name}** — `{total}` pieces{bonus_text}\n> {desc}"
+    )
+
+
+@economy.command(name="crime", description="Commets un crime (risque d'etre arrete)")
+async def eco_crime(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+    now = _time.time()
+    cooldown = 900
+
+    if now - data.get("crime", 0) < cooldown:
+        remaining = cooldown - (now - data["crime"])
+        minutes = int(remaining // 60)
+        await interaction.response.send_message(f"Tu dois attendre **{minutes} minutes**.", ephemeral=True)
+        return
+
+    action = _random.choice(CRIME_ACTIONS)
+    name, success_rate, min_gain, max_gain, desc = action
+
+    has_vpn = "vpn" in data.get("inventory", [])
+    adjusted_rate = min(success_rate + 0.15, 0.85) if has_vpn else success_rate
+
+    data["crime"] = now
+
+    if _random.random() < adjusted_rate:
+        gain = _random.randint(min_gain, max_gain)
+        data["wallet"] += gain
+        data["xp"] = data.get("xp", 0) + 25
+        save_economy_data(eco)
+        vpn_text = " (VPN)" if has_vpn else ""
+        await interaction.response.send_message(
+            f"**Crime reussi{vpn_text}** — `{gain}` pieces\n> {desc}"
+        )
+    else:
+        fine = _random.randint(500, 2000)
+        data["wallet"] = max(0, data["wallet"] - fine)
+        data["xp"] = max(0, data.get("xp", 0) - 10)
+        save_economy_data(eco)
+        await interaction.response.send_message(
+            f"**Arrete !** Amende de `{fine}` pieces\n> Tu as ete attrape. Mauvaise journee."
+        )
+
+
+@economy.command(name="slots", description="Machine a sous")
+@app_commands.describe(amount="Montant a parier")
+async def eco_slots(interaction: discord.Interaction, amount: int):
+    if amount <= 0:
+        await interaction.response.send_message("Montant invalide.", ephemeral=True)
+        return
+
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+
+    if data["wallet"] < amount:
+        await interaction.response.send_message("Pas assez de pieces dans ton porte-monnaie.", ephemeral=True)
+        return
+
+    data["wallet"] -= amount
+    s1, s2, s3 = _random.choice(SLOT_ITEMS), _random.choice(SLOT_ITEMS), _random.choice(SLOT_ITEMS)
+
+    if s1 == s2 == s3:
+        multiplier = 10 if s1 == "💎" else 5 if s1 == "7️⃣" else 3
+        win = amount * multiplier
+        data["wallet"] += win
+        data["xp"] = data.get("xp", 0) + 50
+        result = f"**JACKPOT !** `{s1} | {s2} | {s3}`\n**+{win:,}** pieces"
+    elif s1 == s2 or s2 == s3 or s1 == s3:
+        win = amount * 2
+        data["wallet"] += win
+        data["xp"] = data.get("xp", 0) + 20
+        result = f"**Gagne !** `{s1} | {s2} | {s3}`\n**+{win:,}** pieces"
+    else:
+        data["xp"] = max(0, data.get("xp", 0) - 5)
+        result = f"**Perdu.** `{s1} | {s2} | {s3}`\n**-{amount:,}** pieces"
+
+    save_economy_data(eco)
+    await interaction.response.send_message(result)
+
+
+@economy.command(name="coinflip", description="Pile ou face")
+@app_commands.describe(amount="Montant a parier", choice="pile ou face")
+@app_commands.choices(choice=[
+    app_commands.Choice(name="Pile", value="pile"),
+    app_commands.Choice(name="Face", value="face"),
+])
+async def eco_coinflip(interaction: discord.Interaction, amount: int, choice: str):
+    if amount <= 0:
+        await interaction.response.send_message("Montant invalide.", ephemeral=True)
+        return
+
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+
+    if data["wallet"] < amount:
+        await interaction.response.send_message("Pas assez de pieces.", ephemeral=True)
+        return
+
+    data["wallet"] -= amount
+    result = _random.choice(["pile", "face"])
+
+    if result == choice:
+        data["wallet"] += amount * 2
+        data["xp"] = data.get("xp", 0) + 15
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**{result.upper()}** — Tu gagnes `{amount * 2:,}` pieces !")
+    else:
+        data["xp"] = max(0, data.get("xp", 0) - 3)
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**{result.upper()}** — Tu perds `{amount:,}` pieces.")
+
+
+@economy.command(name="dice", description="Lance un de")
+@app_commands.describe(amount="Montant a parier", target="Nombre vise (1-6)")
+async def eco_dice(interaction: discord.Interaction, amount: int, target: int):
+    if amount <= 0 or target < 1 or target > 6:
+        await interaction.response.send_message("Parametres invalides.", ephemeral=True)
+        return
+
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+
+    if data["wallet"] < amount:
+        await interaction.response.send_message("Pas assez de pieces.", ephemeral=True)
+        return
+
+    data["wallet"] -= amount
+    roll = _random.randint(1, 6)
+
+    if roll == target:
+        win = amount * 5
+        data["wallet"] += win
+        data["xp"] = data.get("xp", 0) + 30
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**{roll}** — Exact ! Tu gagnes `{win:,}` pieces !")
+    elif abs(roll - target) == 1:
+        win = amount
+        data["wallet"] += win
+        data["xp"] = data.get("xp", 0) + 10
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**{roll}** — Presque ! Tu recuperes ta mise.")
+    else:
+        data["xp"] = max(0, data.get("xp", 0) - 3)
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**{roll}** — Raté. Tu perds `{amount:,}` pieces.")
+
+
+@economy.command(name="gamble", description="Double ou rien")
+@app_commands.describe(amount="Montant a parier")
+async def eco_gamble(interaction: discord.Interaction, amount: int):
+    if amount <= 0:
+        await interaction.response.send_message("Montant invalide.", ephemeral=True)
+        return
+
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+
+    if data["wallet"] < amount:
+        await interaction.response.send_message("Pas assez de pieces.", ephemeral=True)
+        return
+
+    data["wallet"] -= amount
+    if _random.random() < 0.45:
+        data["wallet"] += amount * 2
+        data["xp"] = data.get("xp", 0) + 20
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**DOUBLE !** Tu gagnes `{amount * 2:,}` pieces.")
+    else:
+        data["xp"] = max(0, data.get("xp", 0) - 5)
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**PERDU.** Tu perds `{amount:,}` pieces.")
+
+
+@economy.command(name="fish", description="Peche des tresors")
+async def eco_fish(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+
+    if "fishing_rod" not in data.get("inventory", []):
+        await interaction.response.send_message("Tu n'as pas de canne a peche. Achete-la au shop.", ephemeral=True)
+        return
+
+    now = _time.time()
+    if now - data.get("work", 0) < 120:
+        remaining = 120 - (now - data["work"])
+        minutes = int(remaining // 60)
+        await interaction.response.send_message(f"Tu dois attendre **{minutes} minutes**.", ephemeral=True)
+        return
+
+    data["work"] = now
+    catch = _random.choice(FISHING_CATCHES)
+    name, sell, xp_gain = catch
+    data["wallet"] += sell
+    data["xp"] = data.get("xp", 0) + xp_gain
+    save_economy_data(eco)
+
+    await interaction.response.send_message(
+        f"**Peche** — Tu as attrape : **{name}**\n> Vente : `{sell}` pieces | XP: +{xp_gain}"
+    )
+
+
+@economy.command(name="mine", description="Mine des ressources")
+async def eco_mine(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+
+    if "pickaxe" not in data.get("inventory", []):
+        await interaction.response.send_message("Tu n'as pas de pioche. Achete-la au shop.", ephemeral=True)
+        return
+
+    now = _time.time()
+    if now - data.get("work", 0) < 120:
+        remaining = 120 - (now - data["work"])
+        minutes = int(remaining // 60)
+        await interaction.response.send_message(f"Tu dois attendre **{minutes} minutes**.", ephemeral=True)
+        return
+
+    data["work"] = now
+    finds = [
+        ("Charbon", 80, 10),
+        ("Fer", 150, 15),
+        ("Or", 300, 25),
+        ("Diamant", 800, 40),
+        ("Emeraude", 500, 30),
+        ("Rien... juste de la poussiere", 5, 2),
+        ("Un ancien artefact", 2000, 60),
+    ]
+    found = _random.choice(finds)
+    name, sell, xp_gain = found
+    data["wallet"] += sell
+    data["xp"] = data.get("xp", 0) + xp_gain
+    save_economy_data(eco)
+
+    await interaction.response.send_message(
+        f"**Mine** — Tu as trouve : **{name}**\n> Vente : `{sell}` pieces | XP: +{xp_gain}"
+    )
+
+
+@economy.command(name="pay", description="Envoie des pieces a un membre")
+@app_commands.describe(member="Le membre", amount="Montant")
+async def eco_pay(interaction: discord.Interaction, member: discord.Member, amount: int):
+    if amount <= 0:
+        await interaction.response.send_message("Montant invalide.", ephemeral=True)
+        return
+    if member.id == interaction.user.id:
+        await interaction.response.send_message("Tu ne peux pas te payer toi-meme.", ephemeral=True)
+        return
+
+    gid = str(interaction.guild.id)
+    uid_sender = str(interaction.user.id)
+    uid_recipient = str(member.id)
+    eco, sender = get_economy(gid, uid_sender)
+
+    if sender["wallet"] < amount:
+        await interaction.response.send_message("Pas assez de pieces.", ephemeral=True)
+        return
+
+    _, recipient = get_economy(gid, uid_recipient)
+    sender["wallet"] -= amount
+    recipient["wallet"] += amount
+    save_economy_data(eco)
+
+    await interaction.response.send_message(f"**{interaction.user.display_name}** a envoye `{amount:,}` pieces a **{member.display_name}**.")
+
+
+@economy.command(name="deposit", description="Depose des pieces en banque")
+@app_commands.describe(amount="Montant (tout = tout)")
+async def eco_deposit(interaction: discord.Interaction, amount: str = "tout"):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+
+    if amount.lower() in ("tout", "all", "max"):
+        dep = data["wallet"]
+    else:
+        try:
+            dep = int(amount)
+        except ValueError:
+            await interaction.response.send_message("Montant invalide.", ephemeral=True)
+            return
+
+    if dep <= 0 or dep > data["wallet"]:
+        await interaction.response.send_message("Montant invalide.", ephemeral=True)
+        return
+
+    data["wallet"] -= dep
+    data["bank"] += dep
+    save_economy_data(eco)
+    await interaction.response.send_message(f"`{dep:,}` pieces deposees en banque.")
+
+
+@economy.command(name="withdraw", description="Retire des pieces de la banque")
+@app_commands.describe(amount="Montant (tout = tout)")
+async def eco_withdraw(interaction: discord.Interaction, amount: str = "tout"):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+
+    if amount.lower() in ("tout", "all", "max"):
+        wd = data["bank"]
+    else:
+        try:
+            wd = int(amount)
+        except ValueError:
+            await interaction.response.send_message("Montant invalide.", ephemeral=True)
+            return
+
+    if wd <= 0 or wd > data["bank"]:
+        await interaction.response.send_message("Montant invalide.", ephemeral=True)
+        return
+
+    data["bank"] -= wd
+    data["wallet"] += wd
+    save_economy_data(eco)
+    await interaction.response.send_message(f"`{wd:,}` pieces retirees de la banque.")
+
+
+@economy.command(name="shop", description="Voir le magasin")
+async def eco_shop(interaction: discord.Interaction):
+    lines = []
+    for item_id, item in ECONOMY_SHOP.items():
+        lines.append(f"{item['emoji']} **{item_id}** — `{item['price']:,}` — {item['desc']}")
+
+    view = view_text("## Magasin", *lines)
+    await interaction.response.send_message(view=view)
+
+
+@economy.command(name="buy", description="Acheter un objet du magasin")
+@app_commands.describe(item="Nom de l'item", amount="Quantite")
+async def eco_buy(interaction: discord.Interaction, item: str, amount: int = 1):
+    if item not in ECONOMY_SHOP:
+        await interaction.response.send_message("Item introuvable. Utilise `/economy shop`.", ephemeral=True)
+        return
+    if amount <= 0:
+        await interaction.response.send_message("Quantite invalide.", ephemeral=True)
+        return
+
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+    shop_item = ECONOMY_SHOP[item]
+    total_cost = shop_item["price"] * amount
+
+    if data["wallet"] < total_cost:
+        await interaction.response.send_message(f"Pas assez de pieces. Cout : `{total_cost:,}`.", ephemeral=True)
+        return
+
+    data["wallet"] -= total_cost
+    inv = data.get("inventory", [])
+    for _ in range(amount):
+        inv.append(item)
+    data["inventory"] = inv
+    save_economy_data(eco)
+
+    await interaction.response.send_message(
+        f"Achat : **{amount}x {shop_item['emoji']} {item}** — `{total_cost:,}` pieces"
+    )
+
+
+@economy.command(name="inventory", description="Voir ton inventaire")
+@app_commands.describe(member="Membre a inspecter")
+async def eco_inventory(interaction: discord.Interaction, member: discord.Member = None):
+    target = member or interaction.user
+    gid = str(interaction.guild.id)
+    uid = str(target.id)
+    eco, data = get_economy(gid, uid)
+    inv = data.get("inventory", [])
+
+    if not inv:
+        await interaction.response.send_message("Ton inventaire est vide.", ephemeral=True)
+        return
+
+    counts = {}
+    for item in inv:
+        counts[item] = counts.get(item, 0) + 1
+
+    lines = []
+    for item_id, count in counts.items():
+        info = ECONOMY_SHOP.get(item_id, {})
+        emoji = info.get("emoji", "❓")
+        desc = info.get("desc", item_id)
+        lines.append(f"{emoji} **{item_id}** x{count} — {desc}")
+
+    view = view_text(f"## Inventaire de {target.display_name}", *lines)
+    await interaction.response.send_message(view=view)
+
+
+@economy.command(name="sell", description="Vendre un objet")
+@app_commands.describe(item="Nom de l'item", amount="Quantite")
+async def eco_sell(interaction: discord.Interaction, item: str, amount: int = 1):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+    inv = data.get("inventory", [])
+
+    if inv.count(item) < amount:
+        await interaction.response.send_message("Tu n'as pas assez de cet item.", ephemeral=True)
+        return
+
+    shop_item = ECONOMY_SHOP.get(item, {})
+    sell_price = int(shop_item.get("price", 100) * 0.6)
+
+    for _ in range(amount):
+        inv.remove(item)
+    data["inventory"] = inv
+    data["wallet"] += sell_price * amount
+    save_economy_data(eco)
+
+    await interaction.response.send_message(
+        f"Vente : **{amount}x {item}** — `{sell_price * amount:,}` pieces (60% du prix)"
+    )
+
+
+@economy.command(name="rob", description="Vole les pieces d'un membre")
+@app_commands.describe(member="La cible")
+async def eco_rob(interaction: discord.Interaction, member: discord.Member):
+    if member.id == interaction.user.id:
+        await interaction.response.send_message("Tu ne peux pas te voler toi-meme.", ephemeral=True)
+        return
+
+    gid = str(interaction.guild.id)
+    uid_thief = str(interaction.user.id)
+    uid_victim = str(member.id)
+    eco, thief = get_economy(gid, uid_thief)
+
+    now = _time.time()
+    if now - thief.get("rob", 0) < 1800:
+        remaining = 1800 - (now - thief["rob"])
+        minutes = int(remaining // 60)
+        await interaction.response.send_message(f"Tu dois attendre **{minutes} minutes**.", ephemeral=True)
+        return
+
+    _, victim = get_economy(gid, uid_victim)
+
+    if victim.get("wallet", 0) < 100:
+        await interaction.response.send_message("Cette personne est fauche.", ephemeral=True)
+        return
+
+    if "shield" in victim.get("inventory", []):
+        thief["rob"] = now
+        fine = _random.randint(500, 1500)
+        thief["wallet"] = max(0, thief["wallet"] - fine)
+        save_economy_data(eco)
+        await interaction.response.send_message(
+            f"**{member.display_name}** a un bouclier ! Tu es penalise `{fine:,}` pieces."
+        )
+        return
+
+    if _random.random() < 0.45:
+        steal = _random.randint(100, min(victim["wallet"], 5000))
+        victim["wallet"] -= steal
+        thief["wallet"] += steal
+        thief["rob"] = now
+        thief["xp"] = thief.get("xp", 0) + 20
+        save_economy_data(eco)
+        await interaction.response.send_message(
+            f"**Vol reussi** — Tu as vole `{steal:,}` pieces a **{member.display_name}**."
+        )
+    else:
+        thief["rob"] = now
+        fine = _random.randint(500, 2000)
+        thief["wallet"] = max(0, thief["wallet"] - fine)
+        thief["xp"] = max(0, thief.get("xp", 0) - 10)
+        save_economy_data(eco)
+        await interaction.response.send_message(
+            f"**Rate** — Tu es arrete. Amende de `{fine:,}` pieces."
+        )
+
+
+@economy.command(name="leaderboard", description="Classement des plus riches")
+async def eco_leaderboard(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    eco = load_economy()
+    g = eco.get(gid, {})
+
+    if not g:
+        await interaction.response.send_message("Aucune donnee.", ephemeral=True)
+        return
+
+    sorted_users = sorted(g.items(), key=lambda x: x[1].get("wallet", 0) + x[1].get("bank", 0), reverse=True)[:15]
+
+    lines = []
+    medals = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+    for i, (uid, data) in enumerate(sorted_users):
+        member = interaction.guild.get_member(int(uid))
+        name = member.display_name if member else f"ID: {uid}"
+        total = data.get("wallet", 0) + data.get("bank", 0)
+        medal = medals[i] if i < len(medals) else f"#{i+1}"
+        lines.append(f"{medal} **{name}** — `{total:,}` pieces")
+
+    view = view_text("## Classement economique", *lines)
+    await interaction.response.send_message(view=view)
+
+
+@economy.command(name="slots_jackpot", description="Jackpot speciale (cout 10000)")
+async def eco_slots_jackpot(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    uid = str(interaction.user.id)
+    eco, data = get_economy(gid, uid)
+
+    if data["wallet"] < 10000:
+        await interaction.response.send_message("Tu dois avoir `10,000` pieces.", ephemeral=True)
+        return
+
+    data["wallet"] -= 10000
+    roll = _random.random()
+
+    if roll < 0.01:
+        win = 500000
+        data["wallet"] += win
+        data["xp"] = data.get("xp", 0) + 200
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**MEGA JACKPOT !!** Tu gagnes **{win:,}** pieces !")
+    elif roll < 0.05:
+        win = 50000
+        data["wallet"] += win
+        data["xp"] = data.get("xp", 0) + 100
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**Jackpot !** Tu gagnes **{win:,}** pieces !")
+    elif roll < 0.15:
+        win = 20000
+        data["wallet"] += win
+        data["xp"] = data.get("xp", 0) + 50
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**Gagne !** Tu gagnes **{win:,}** pieces !")
+    elif roll < 0.30:
+        win = 12000
+        data["wallet"] += win
+        data["xp"] = data.get("xp", 0) + 20
+        save_economy_data(eco)
+        await interaction.response.send_message(f"**Rembourse !** Tu gagnes **{win:,}** pieces !")
+    else:
+        data["xp"] = max(0, data.get("xp", 0) - 10)
+        save_economy_data(eco)
+        await interaction.response.send_message("**PERDU.** Tu perds 10,000 pieces.")
 
 
 # ──────────────────────────────────────────────

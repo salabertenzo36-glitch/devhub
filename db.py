@@ -118,4 +118,12 @@ def save_raid_config(gid, config):
     if gid not in settings:
         settings[gid] = {}
     settings[gid].update(config)
+
+
+def load_economy():
+    return _load("economy")
+
+
+def save_economy(data):
+    _save("economy", data)
     save_settings(settings)
