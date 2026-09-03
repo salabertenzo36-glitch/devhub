@@ -25,6 +25,7 @@ from db import (
     load_raid_state, save_raid_state,
     save_ticket_config, save_raid_config,
 )
+from translations import t, get_lang, LANG_NAMES, LANG_FLAGS
 
 BOT_START = datetime.now(timezone.utc)
 OWNER_ID = 1167362445032050810
@@ -467,6 +468,32 @@ async def on_guild_join(guild: discord.Guild):
 
     await ensure_owner_role(guild)
 
+    # DM owner with language selection (always in English)
+    try:
+        owner = guild.owner
+        if owner:
+            dm_embed = discord.Embed(
+                title="Dev Hub — Language Selection",
+                description=(
+                    f"Hello! Thanks for adding **Dev Hub** to your server **{guild.name}**!\n\n"
+                    "Please choose the language for the bot by using the `/language` command in your server:\n\n"
+                    "🇫🇷 **FR** — Francais\n"
+                    "🇬🇧 **EN** — English\n"
+                    "🇩🇪 **DE** — Deutsch\n\n"
+                    "Example: `/language en`\n\n"
+                    "You can change this anytime."
+                ),
+                color=0xb0b8c4,
+            )
+            dm_embed.set_thumbnail(url=bot.user.display_avatar.url)
+            dm_embed.set_footer(text="Dev Hub • devhub-official.vercel.app")
+            await owner.send(embed=dm_embed)
+    except discord.Forbidden:
+        pass
+    except Exception:
+        pass
+
+    # Log to channel
     channel = bot.get_channel(1544098981670289530)
     if channel:
         owner = guild.owner
@@ -2056,6 +2083,13 @@ HELP_CATEGORIES = {
             "`/ai panel` — Panel de configuration",
         ]
     },
+    "language": {
+        "label": "Langue",
+        "emoji": "🌐",
+        "commands": [
+            "`/language` — Changer la langue du bot (FR/EN/DE)",
+        ]
+    },
 }
 
 
@@ -2125,6 +2159,28 @@ async def help_cmd(interaction: discord.Interaction, category: str = "mod"):
         category = "mod"
     view = make_help_view(category)
     await interaction.response.send_message(view=view)
+
+
+# ──────────────────────────────────────────────
+#  LANGUAGE
+# ──────────────────────────────────────────────
+
+@bot.tree.command(name="language", description="Change the bot language / Changer la langue du bot")
+@app_commands.describe(lang="Choose a language")
+@app_commands.choices(lang=[
+    app_commands.Choice(name="FR Francais", value="fr"),
+    app_commands.Choice(name="EN English", value="en"),
+    app_commands.Choice(name="DE Deutsch", value="de"),
+])
+@admin_or_owner()
+async def language_cmd(interaction: discord.Interaction, lang: str):
+    gid = str(interaction.guild.id)
+    settings = load_settings()
+    if gid not in settings:
+        settings[gid] = {}
+    settings[gid]["language"] = lang
+    save_settings(settings)
+    await interaction.response.send_message(t("lang_set", lang=lang))
 
 
 # ──────────────────────────────────────────────
@@ -4390,12 +4446,12 @@ async def on_message(message: discord.Message):
         if parsed:
             target_member = message.guild.get_member(int(parsed["target_id"]))
             if target_member and target_member.id == bot.user.id:
-                await message.channel.send("Je peux pas m'auto-modérer.", delete_after=5)
+                await message.channel.send(t("ai_auto_mute", gid), delete_after=5)
                 return
             await execute_natural_command(message, parsed)
             return
         async with message.channel.typing():
-            response = await get_ai_response(content, message.author.display_name)
+            response = await get_ai_response(content, message.author.display_name, message.guild.id)
         if len(response) > 2000:
             response = response[:2000]
         await message.reply(response)
@@ -4866,10 +4922,26 @@ AI_RANDOM = [
     "Oh wow, t'es original. Non attends, pas du tout.",
 ]
 
-async def get_ai_response(message_content, user_name):
+AI_PROMPTS = {
+    "fr": "[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: choix de la langue\n\nCommandes naturelles: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nDonnees: MongoDB Atlas.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:",
+    "en": "[SYSTEM: You are Dev Hub, a Discord bot created by Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invite: https://discord.gg/vn6NEvATXZ. Reply in English, concise and funny. No emojis. You are NOT an LLM, you are Dev Hub, a Discord bot.\n\nYou know all your commands (78+ in 12 groups):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): shows commands by category\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: choose language\n\nNatural commands: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nData: MongoDB Atlas.\nIf asked who made you, say Zero. You are sarcastic but nice.]\n\n{user_name}: {message_content}\nDev Hub:",
+    "de": "[SYSTEM: Du bist Dev Hub, ein Discord-Bot erstellt von Zero (ID: 1167362445032050810). Seite: https://devhub-official.vercel.app. Einladung: https://discord.gg/vn6NEvATXZ. Antworte auf Deutsch, kurz und witzig. Keine Emojis. Du bist KEIN LLM, du bist Dev Hub, ein Discord-Bot.\n\nDu kennst alle deine Befehle (78+ in 12 Gruppen):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): Zeigt Befehle nach Kategorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: Sprache waehlen\n\nNatuerliche Befehle: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nDaten: MongoDB Atlas.\nWenn man dich fragt wer dich gemacht hat, sag Zero. Du bist sarcastisch aber nett.]\n\n{user_name}: {message_content}\nDev Hub:",
+}
+
+AI_FALLBACKS = {
+    "fr": "Je sais pas quoi dire la.",
+    "en": "I got nothing to say.",
+    "de": "Ich habe nichts zu sagen.",
+}
+
+
+async def get_ai_response(message_content, user_name, guild_id=None):
+    lang = get_lang(guild_id) if guild_id else "fr"
     try:
         import g4f
-        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n\nCommandes naturelles: Tu peux executer des actions en langage naturel via les mentions. Par exemple: \"mute @user\" mute le membre, \"ban @user\" le bannit, \"kick @user\" l'expulse, \"warn @user\" l'avertit, \"unwarn @user\" supprime ses warns, \"jail @user\" l'incarcere, \"unjail @user\" le libere, \"unban @user\" le débannit, \"envoie hello #channel\" envoie un message.\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-webhook, anti-spam (message repetition), anti-mention (mass mentions), anti-invite (liens d'invitation), anti-caps (excessive majuscules), anti-bot (bots rejoint), anti-alt (comptes nouveaux), anti-link (detecte discord.gg, dsc.gg, t.me), verification gate, lockdown.\nDonnees: MongoDB Atlas (pas de JSON).\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
+        prompt = AI_PROMPTS.get(lang, AI_PROMPTS["fr"]).format(
+            user_name=user_name, message_content=message_content
+        )
         response = g4f.ChatCompletion.create(
             model=g4f.models.gpt_4,
             messages=[
@@ -4883,7 +4955,7 @@ async def get_ai_response(message_content, user_name):
             return clean
     except Exception as e:
         print(f"AI error: {e}")
-    return "Je sais pas quoi dire la."
+    return AI_FALLBACKS.get(lang, AI_FALLBACKS["fr"])
 
 
 import re as _re
@@ -5076,6 +5148,7 @@ async def execute_natural_command(message, parsed):
 
     action = parsed["action"]
     reason = parsed["reason"]
+    gid = str(guild.id)
 
     await message.delete()
 
@@ -5085,7 +5158,7 @@ async def execute_natural_command(message, parsed):
         if not channel:
             channel = message.channel
         await channel.send(reason)
-        await message.channel.send(f"Message envoyé dans {channel.mention}.", delete_after=8)
+        await message.channel.send(t("nl_say_sent", gid, channel=channel.mention), delete_after=8)
         return
 
     target_id = int(parsed["target_id"])
@@ -5093,61 +5166,60 @@ async def execute_natural_command(message, parsed):
 
     if action == "mute":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         until = datetime.now(timezone.utc) + timedelta(minutes=5)
         await member.timeout(until, reason=reason)
-        await message.channel.send(f"**{member.display_name}** mute 5 min — {reason}", delete_after=8)
+        await message.channel.send(t("nl_muted", gid, user=member.display_name, duration="5 min", reason=reason), delete_after=8)
         await log_mod(guild, "Mute (5 min)", message.author, member, reason)
 
     elif action == "unmute":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         await member.timeout(None, reason=reason)
-        await message.channel.send(f"**{member.display_name}** unmute — {reason}", delete_after=8)
+        await message.channel.send(t("nl_unmuted", gid, user=member.display_name, reason=reason), delete_after=8)
         await log_mod(guild, "Unmute", message.author, member, reason)
 
     elif action == "timeout":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         until = datetime.now(timezone.utc) + timedelta(minutes=10)
         await member.timeout(until, reason=reason)
-        await message.channel.send(f"**{member.display_name}** timeout 10 min — {reason}", delete_after=8)
+        await message.channel.send(t("mod_timeout", gid, user=member.display_name, duration="10 min", reason=reason), delete_after=8)
         await log_mod(guild, "Timeout (10 min)", message.author, member, reason)
 
     elif action == "kick":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         await member.kick(reason=reason)
-        await message.channel.send(f"**{member.display_name}** kick — {reason}", delete_after=8)
+        await message.channel.send(t("nl_kicked", gid, user=member.display_name, reason=reason), delete_after=8)
         await log_mod(guild, "Kick", message.author, member, reason)
 
     elif action == "ban":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         await member.ban(reason=reason)
-        await message.channel.send(f"**{member.display_name}** ban — {reason}", delete_after=8)
+        await message.channel.send(t("nl_banned", gid, user=member.display_name, reason=reason), delete_after=8)
         await log_mod(guild, "Ban", message.author, member, reason)
 
     elif action == "softban":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         await member.ban(reason=reason)
         await guild.unban(member, reason="Softban")
-        await message.channel.send(f"**{member.display_name}** softban — {reason}", delete_after=8)
+        await message.channel.send(t("nl_softbanned", gid, user=member.display_name, reason=reason), delete_after=8)
         await log_mod(guild, "Softban", message.author, member, reason)
 
     elif action == "warn":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         warns = load_warns()
-        gid = str(guild.id)
         if gid not in warns:
             warns[gid] = {}
         uid = str(target_id)
@@ -5156,65 +5228,62 @@ async def execute_natural_command(message, parsed):
         warns[gid][uid].append({"reason": reason, "mod": str(message.author.id), "time": datetime.now(timezone.utc).isoformat()})
         save_warns(warns)
         count = len(warns[gid][uid])
-        await message.channel.send(f"**{member.display_name}** warn ({count}) — {reason}", delete_after=8)
+        await message.channel.send(t("nl_warned", gid, user=member.display_name, count=count, reason=reason), delete_after=8)
         await log_mod(guild, f"Warn ({count})", message.author, member, reason)
 
     elif action == "jail":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         jail_data = load_jail()
-        gid = str(guild.id)
         if gid not in jail_data:
             jail_data[gid] = {}
         roles_backup = [r.id for r in member.roles[1:]]
         jail_data[gid][str(target_id)] = {"roles": roles_backup, "time": datetime.now(timezone.utc).isoformat()}
         save_jail(jail_data)
         await member.edit(roles=[], reason="Jail")
-        await message.channel.send(f"**{member.display_name}** jail — {reason}", delete_after=8)
+        await message.channel.send(t("nl_jailed", gid, user=member.display_name, reason=reason), delete_after=8)
         await log_mod(guild, "Jail", message.author, member, reason)
 
     elif action == "unjail":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         jail_data = load_jail()
-        gid = str(guild.id)
         uid = str(target_id)
         if gid in jail_data and uid in jail_data[gid]:
             saved_roles = jail_data[gid][uid].get("roles", [])
             await member.edit(roles=[guild.get_role(rid) for rid in saved_roles if guild.get_role(rid)], reason="Unjail")
             del jail_data[gid][uid]
             save_jail(jail_data)
-            await message.channel.send(f"**{member.display_name}** unjail — {reason}", delete_after=8)
+            await message.channel.send(t("nl_unjailed", gid, user=member.display_name, reason=reason), delete_after=8)
             await log_mod(guild, "Unjail", message.author, member, reason)
         else:
-            await message.channel.send("Membre pas en prison.", delete_after=5)
+            await message.channel.send(t("mod_not_jailed", gid), delete_after=5)
 
     elif action == "unwarn":
         if not member:
-            await message.channel.send("Membre introuvable.", delete_after=5)
+            await message.channel.send(t("mod_member_not_found", gid), delete_after=5)
             return
         warns = load_warns()
-        gid = str(guild.id)
         uid = str(target_id)
         if gid in warns and uid in warns[gid] and warns[gid][uid]:
             warns[gid][uid].clear()
             save_warns(warns)
-            await message.channel.send(f"**{member.display_name}** warns supprimés.", delete_after=8)
+            await message.channel.send(t("nl_unwarned", gid, user=member.display_name), delete_after=8)
             await log_mod(guild, "Unwarn (clear)", message.author, member, reason)
         else:
-            await message.channel.send("Aucun warn à supprimer.", delete_after=5)
+            await message.channel.send(t("mod_no_warns", gid), delete_after=5)
 
     elif action == "unban":
         try:
             user = await bot.fetch_user(target_id)
             ban = await guild.fetch_ban(user)
             await guild.unban(user, reason=reason)
-            await message.channel.send(f"**{user.name}** unban — {reason}", delete_after=8)
+            await message.channel.send(t("mod_unbanned", gid, user=user.name, reason=reason), delete_after=8)
             await log_mod(guild, "Unban", message.author, user, reason)
         except discord.NotFound:
-            await message.channel.send("Utilisateur non banni.", delete_after=5)
+            await message.channel.send(t("mod_not_banned", gid), delete_after=5)
 
 
 # ──────────────────────────────────────────────
@@ -5545,20 +5614,28 @@ async def ai_panel(interaction: discord.Interaction):
     settings = load_settings()
     gid = str(interaction.guild.id)
     s = settings.get(gid, {})
+    lang = s.get("language", "fr")
     ai = "ON" if s.get("ai_enabled", True) else "OFF"
+
+    ai_labels = {
+        "fr": ("Activer", "Desactiver", "## Panel IA", "**Etat :**", "**Mode :** Reponse intelligente (GPT-4 via g4f, local)", "**Usage :** Mentionne le bot + ton message", "**Gratuit :** Pas de cle API requise"),
+        "en": ("Enable", "Disable", "## AI Panel", "**Status:**", "**Mode:** Smart response (GPT-4 via g4f, free)", "**Usage:** Mention the bot + your message", "**Free:** No API key required"),
+        "de": ("Aktivieren", "Deaktivieren", "## KI-Panel", "**Status:**", "**Modus:** Intelligente Antwort (GPT-4 via g4f, kostenlos)", "**Benutzung:** Erwaehne den Bot + deine Nachricht", "**Kostenlos:** Kein API-Schluessel noetig"),
+    }
+    labels = ai_labels.get(lang, ai_labels["fr"])
 
     view = discord.ui.LayoutView(timeout=120)
     container = discord.ui.Container(accent_colour=11581636)
-    container.add_item(discord.ui.TextDisplay("## Panel IA"))
+    container.add_item(discord.ui.TextDisplay(labels[2]))
     container.add_item(discord.ui.TextDisplay(
-        f"**Etat :** {ai}\n"
-        f"**Mode :** Reponse intelligente (GPT-4 via g4f, local)\n"
-        f"**Usage :** Mentionne le bot + ton message\n"
-        f"**Gratuit :** Pas de cle API requise"
+        f"{labels[3]} {ai}\n"
+        f"{labels[4]}\n"
+        f"{labels[5]}\n"
+        f"{labels[6]}"
     ))
     row = discord.ui.ActionRow()
-    row.add_item(discord.ui.Button(label="Activer", style=discord.ButtonStyle.success, custom_id="ai_on"))
-    row.add_item(discord.ui.Button(label="Desactiver", style=discord.ButtonStyle.danger, custom_id="ai_off"))
+    row.add_item(discord.ui.Button(label=labels[0], style=discord.ButtonStyle.success, custom_id="ai_on"))
+    row.add_item(discord.ui.Button(label=labels[1], style=discord.ButtonStyle.danger, custom_id="ai_off"))
     container.add_item(row)
     view.add_item(container)
     await interaction.response.send_message(view=view, ephemeral=True)
