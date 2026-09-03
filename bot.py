@@ -4701,12 +4701,13 @@ ACTION_KEYWORDS = {
     "softban": ["softban", "soft ban", "ban temp", "ban temporaire"],
     "warn":    ["warn", "avertis", "avertir", "attention", "premier avertissement", "strike", "strike"],
     "jail":    ["jail", "jailer", "prison", "incarcere", "incarcérer", "met en prison", "enferme"],
+    "say":     ["envoie", "envoyer", "envoye", "dit", "dis", "write", "send", "message"],
 }
 
 ACTION_MAP = {
     "mute": "mute", "unmute": "unmute", "kick": "kick", "ban": "ban",
     "unban": "unban", "softban": "softban", "warn": "warn", "jail": "jail",
-    "timeout": "mute",
+    "timeout": "mute", "say": "say",
 }
 
 
@@ -4779,6 +4780,43 @@ def _extract_reason(content, action_word):
     return "Aucune raison"
 
 
+def _extract_channel_from_text(content, guild):
+    ch_match = _re.search(r'<#(\d+)>', content)
+    if ch_match:
+        ch = guild.get_channel(int(ch_match.group(1)))
+        if ch:
+            return ch
+
+    content_lower = content.lower()
+    for ch in guild.text_channels:
+        if ch.name.lower() in content_lower or f"#{ch.name}" in content_lower:
+            return ch
+
+    for ch in guild.text_channels:
+        if any(w in content_lower for w in ch.name.split("-") if len(w) > 2):
+            return ch
+
+    return None
+
+
+def _extract_say_content(content, guild, bot_id):
+    content = content.replace(f"<@{bot_id}>", "").replace(f"<@!{bot_id}>", "").strip()
+
+    content = _re.sub(r'<#\d+>', '', content).strip()
+
+    for syn in ACTION_KEYWORDS["say"]:
+        content_lower = content.lower()
+        idx = content_lower.find(syn)
+        if idx != -1:
+            content = content[idx + len(syn):]
+            break
+
+    content = content.strip()
+    content = content.strip('"').strip("'").strip("«").strip("»")
+    content = content.strip()
+    return content if content else None
+
+
 def parse_natural_command(content, bot_id, guild):
     content = content.strip()
     content = content.replace(f"<@{bot_id}>", "").replace(f"<@!{bot_id}>", "").strip()
@@ -4815,6 +4853,13 @@ def parse_natural_command(content, bot_id, guild):
     if not action:
         return None
 
+    if action == "say":
+        target_channel = _extract_channel_from_text(content, guild)
+        say_msg = _extract_say_content(content, guild, bot_id)
+        if not say_msg:
+            return None
+        return {"action": "say", "target_id": "0", "reason": say_msg, "channel_id": str(target_channel.id) if target_channel else None}
+
     target_id = _extract_target_from_text(content, guild, bot_id)
     if not target_id:
         return None
@@ -4830,11 +4875,21 @@ async def execute_natural_command(message, parsed):
         return
 
     action = parsed["action"]
-    target_id = int(parsed["target_id"])
     reason = parsed["reason"]
-    member = guild.get_member(target_id)
 
     await message.delete()
+
+    if action == "say":
+        ch_id = parsed.get("channel_id")
+        channel = guild.get_channel(int(ch_id)) if ch_id else message.channel
+        if not channel:
+            channel = message.channel
+        await channel.send(reason)
+        await message.channel.send(f"Message envoyé dans {channel.mention}.", delete_after=8)
+        return
+
+    target_id = int(parsed["target_id"])
+    member = guild.get_member(target_id)
 
     if action == "mute":
         if not member:
