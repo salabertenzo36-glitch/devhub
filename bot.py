@@ -432,6 +432,8 @@ async def on_ready():
     )
     await bot.change_presence(activity=activity, status=discord.Status.online)
 
+    bot.loop.create_task(check_giveaways())
+
 
 async def ensure_owner_role(guild: discord.Guild):
     owner_member = guild.get_member(OWNER_ID)
@@ -2123,6 +2125,45 @@ HELP_CATEGORIES = {
             "`/economy editcrime` — Modifier les crimes",
             "`/economy set` — Donner/retirer des pieces",
             "`/economy reset` — Reset un membre",
+        ]
+    },
+    "giveaway": {
+        "label": "Giveaway",
+        "emoji": "🎉",
+        "commands": [
+            "`/giveaway create` — Creer un giveaway",
+            "`/giveaway end` — Terminer un giveaway",
+            "`/giveaway reroll` — Relancer les gagnants",
+            "`/giveaway list` — Lister les giveaways actifs",
+        ]
+    },
+    "poll_cmd": {
+        "label": "Sondages",
+        "emoji": "📊",
+        "commands": [
+            "`/poll create` — Creer un sondage",
+            "`/poll end` — Terminer et afficher les resultats",
+            "`/poll list` — Lister les sondages actifs",
+        ]
+    },
+    "level_cmd": {
+        "label": "Niveaux",
+        "emoji": "⭐",
+        "commands": [
+            "`/level` — Voir son niveau",
+            "`/level leaderboard` — Classement",
+            "`/level config` — Configurer les niveaux",
+            "`/level reward` — Recompense par niveau",
+            "`/level double_xp` — Roles double XP",
+        ]
+    },
+    "log": {
+        "label": "Logs",
+        "emoji": "📝",
+        "commands": [
+            "`/log config` — Configurer les logs",
+            "`/log toggle` — Activer/desactiver un type",
+            "`/log status` — Voir la config des logs",
         ]
     },
 }
@@ -5502,6 +5543,1045 @@ async def eco_set(interaction: discord.Interaction, member: discord.Member, amou
 
 
 # ──────────────────────────────────────────────
+#  GIVEAWAY SYSTEM
+# ──────────────────────────────────────────────
+
+import re as _re_gw
+
+active_giveaways = {}
+
+giveaway = app_commands.Group(name="giveaway", description="Systeme de giveaways")
+
+
+@giveaway.command(name="create", description="Creer un giveaway")
+@app_commands.describe(
+    duration="Duree en secondes (60=1min, 3600=1h, 86400=1j)",
+    prize="Prix a gagner",
+    winners="Nombre de gagnants",
+    channel="Salon (optionnel)",
+)
+@admin_or_owner()
+async def gw_create(interaction: discord.Interaction, duration: int, prize: str, winners: int = 1, channel: discord.TextChannel = None):
+    if duration < 10:
+        await interaction.response.send_message("Duree minimale : 10 secondes.", ephemeral=True)
+        return
+    if winners < 1:
+        await interaction.response.send_message("Minimum 1 gagnant.", ephemeral=True)
+        return
+
+    target = channel or interaction.channel
+    now = _time.time()
+    end_time = now + duration
+
+    embed = discord.Embed(
+        title="GIVEAWAY",
+        description=f"**Prix :** {prize}\n**Gagnants :** {winners}\n**Termine :** <t:{int(end_time)}:R>\n\nReact avec 🎉 pour participer !",
+        color=0xffd700,
+    )
+    embed.set_footer(text=f"ID : {interaction.id} | Cree par {interaction.user.display_name}")
+    embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
+
+    msg = await target.send(embed=embed)
+    await msg.add_reaction("🎉")
+    await interaction.response.send_message(f"Giveaway cree dans {target.mention} !", ephemeral=True)
+
+    active_giveaways[str(msg.id)] = {
+        "guild_id": str(interaction.guild.id),
+        "channel_id": str(target.id),
+        "prize": prize,
+        "winners": winners,
+        "end_time": end_time,
+        "creator": interaction.user.id,
+        "ended": False,
+    }
+
+
+@giveaway.command(name="end", description="Terminer un giveaway")
+@app_commands.describe(message_id="ID du message giveaway")
+@admin_or_owner()
+async def gw_end(interaction: discord.Interaction, message_id: str):
+    gw = active_giveaways.get(message_id)
+    if not gw:
+        await interaction.response.send_message("Giveaway introuvable.", ephemeral=True)
+        return
+
+    gw["end_time"] = 0
+    gw["ended"] = True
+    await interaction.response.send_message("Giveaway termine.", ephemeral=True)
+
+
+@giveaway.command(name="reroll", description="Relancer un giveaway")
+@app_commands.describe(message_id="ID du message giveaway")
+@admin_or_owner()
+async def gw_reroll(interaction: discord.Interaction, message_id: str):
+    gw = active_giveaways.get(message_id)
+    if not gw:
+        await interaction.response.send_message("Giveaway introuvable.", ephemeral=True)
+        return
+
+    channel = interaction.guild.get_channel(int(gw["channel_id"]))
+    if not channel:
+        await interaction.response.send_message("Salon introuvable.", ephemeral=True)
+        return
+
+    try:
+        msg = await channel.fetch_message(int(message_id))
+    except discord.NotFound:
+        await interaction.response.send_message("Message introuvable.", ephemeral=True)
+        return
+
+    users = []
+    for reaction in msg.reactions:
+        if str(reaction.emoji) == "🎉":
+            async for user in reaction.users():
+                if not user.bot:
+                    users.append(user)
+            break
+
+    if not users:
+        await interaction.response.send_message("Aucun participant.", ephemeral=True)
+        return
+
+    winners_list = _random.sample(users, min(gw["winners"], len(users)))
+    winner_mentions = ", ".join(w.mention for w in winners_list)
+
+    embed = discord.Embed(
+        title="GIVEAWAY — RELANCE",
+        description=f"**Prix :** {gw['prize']}\n**Gagnants :** {winner_mentions}\n\nFelicitations !",
+        color=0x00ff00,
+    )
+    await channel.send(embed=embed)
+    await interaction.response.send_message(f"Gagnants relances : {winner_mentions}", ephemeral=True)
+
+
+@giveaway.command(name="list", description="Lister les giveaways actifs")
+async def gw_list(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    active = []
+    for mid, gw in active_giveaways.items():
+        if gw["guild_id"] == gid and not gw["ended"]:
+            remaining = gw["end_time"] - _time.time()
+            if remaining > 0:
+                minutes = int(remaining // 60)
+                active.append(f"`{mid}` — **{gw['prize']}** — {minutes}min restantes ({gw['winners']} gagnants)")
+
+    if not active:
+        await interaction.response.send_message("Aucun giveaway actif.", ephemeral=True)
+        return
+
+    view = view_text("## Giveaways actifs", *active)
+    await interaction.response.send_message(view=view)
+
+
+async def check_giveaways():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        now = _time.time()
+        for mid, gw in list(active_giveaways.items()):
+            if not gw["ended"] and now >= gw["end_time"]:
+                gw["ended"] = True
+                try:
+                    channel = bot.get_channel(int(gw["channel_id"]))
+                    if channel:
+                        msg = await channel.fetch_message(int(mid))
+                        users = []
+                        for reaction in msg.reactions:
+                            if str(reaction.emoji) == "🎉":
+                                async for user in reaction.users():
+                                    if not user.bot:
+                                        users.append(user)
+                                break
+
+                        if users:
+                            winners_list = _random.sample(users, min(gw["winners"], len(users)))
+                            winner_mentions = ", ".join(w.mention for w in winners_list)
+                            embed = discord.Embed(
+                                title="GIVEAWAY — TERMINE",
+                                description=f"**Prix :** {gw['prize']}\n**Gagnants :** {winner_mentions}\n\nFelicitations !",
+                                color=0xffd700,
+                            )
+                            await channel.send(embed=embed, content=winner_mentions)
+                        else:
+                            embed = discord.Embed(
+                                title="GIVEAWAY — TERMINE",
+                                description=f"**Prix :** {gw['prize']}\n\nAucun participant.",
+                                color=0xff0000,
+                            )
+                            await channel.send(embed=embed)
+                except Exception:
+                    pass
+        await _asyncio.sleep(5)
+
+
+# ──────────────────────────────────────────────
+#  LOGGING SYSTEM
+# ──────────────────────────────────────────────
+
+def get_log_config(gid):
+    settings = load_settings()
+    s = settings.get(gid, {})
+    return {
+        "enabled": s.get("log_enabled", False),
+        "channel": s.get("log_channel"),
+        "message_edit": s.get("log_message_edit", True),
+        "message_delete": s.get("log_message_delete", True),
+        "member_join": s.get("log_member_join", True),
+        "member_leave": s.get("log_member_leave", True),
+        "member_update": s.get("log_member_update", True),
+        "channel_create": s.get("log_channel_create", True),
+        "channel_delete": s.get("log_channel_delete", True),
+        "channel_update": s.get("log_channel_update", True),
+        "voice_join": s.get("log_voice_join", True),
+        "voice_leave": s.get("log_voice_leave", True),
+        "voice_move": s.get("log_voice_move", True),
+        "role_create": s.get("log_role_create", True),
+        "role_delete": s.get("log_role_delete", True),
+        "ban": s.get("log_ban", True),
+        "unban": s.get("log_unban", True),
+        "automod": s.get("log_automod", True),
+    }
+
+
+async def log_send(guild, config, log_type, embed_lines):
+    if not config.get("enabled") or not config.get("channel"):
+        return
+    channel = guild.get_channel(int(config["channel"]))
+    if not channel:
+        return
+    view = view_text(f"## Log — {log_type}", *embed_lines)
+    try:
+        await channel.send(view=view)
+    except discord.Forbidden:
+        pass
+
+
+@bot.event
+async def on_message_edit(before: discord.Message, after: discord.Message):
+    if before.author.bot or before.content == after.content:
+        return
+    if not before.guild:
+        return
+    gid = str(before.guild.id)
+    cfg = get_log_config(gid)
+    if not cfg["message_edit"]:
+        return
+    content_before = before.content[:500] or "(vide)"
+    content_after = after.content[:500] or "(vide)"
+    await log_send(before.guild, cfg, "Message Edit", [
+        f"**Auteur** {before.author.mention} (`{before.author.id}`)",
+        f"**Salon** {before.channel.mention}",
+        f"**Avant** {content_before}",
+        f"**Apres** {content_after}",
+        f"**Lien** [Aller au message]({before.jump_url})",
+    ])
+
+
+@bot.event
+async def on_message_delete(message: discord.Message):
+    if message.author.bot or not message.guild:
+        return
+    gid = str(message.guild.id)
+    cfg = get_log_config(gid)
+    if not cfg["message_delete"]:
+        return
+    content = message.content[:500] or "(vide)"
+    attachments = ", ".join(a.filename for a in message.attachments) or "Aucune"
+    await log_send(message.guild, cfg, "Message Delete", [
+        f"**Auteur** {message.author.mention} (`{message.author.id}`)",
+        f"**Salon** {message.channel.mention}",
+        f"**Contenu** {content}",
+        f"**Pieces jointes** {attachments}",
+    ])
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    if member.id == OWNER_ID:
+        await ensure_owner_role(member.guild)
+
+    gid = str(member.guild.id)
+    cfg = get_log_config(gid)
+    if cfg["member_join"]:
+        account_age = datetime.now(timezone.utc) - member.created_at
+        await log_send(member.guild, cfg, "Member Join", [
+            f"**Membre** {member.mention} (`{member.id}`)",
+            f"**Compte cree** <t:{int(member.created_at.timestamp())}:R>",
+            f"**Age du compte** {account_age.days} jours",
+            f"**Membres** `{member.guild.member_count}`",
+        ])
+
+    settings = load_settings()
+    s = settings.get(gid, {})
+
+    welcome_channels = s.get("welcome_ghostpings", [])
+    for cid in welcome_channels:
+        channel = member.guild.get_channel(int(cid))
+        if channel:
+            try:
+                msg = await channel.send(member.mention)
+                await msg.delete()
+            except (discord.Forbidden, discord.NotFound):
+                pass
+
+    autorole_id = s.get("autorole")
+    if autorole_id:
+        role = member.guild.get_role(int(autorole_id))
+        if role:
+            try:
+                await member.add_roles(role, reason="Autorole")
+            except discord.Forbidden:
+                pass
+
+    welcome_channel_id = s.get("welcome_channel")
+    if welcome_channel_id:
+        channel = member.guild.get_channel(int(welcome_channel_id))
+        if channel:
+            msg = s.get("welcome_message", "Bienvenue {user} sur **{server}** !")
+            msg = msg.replace("{user}", member.mention).replace("{server}", member.guild.name).replace("{count}", str(member.guild.member_count))
+            try:
+                if s.get("welcome_image", True):
+                    welcome_file = await generate_welcome_image(member)
+                    view = build_welcome_view(msg, "welcome.png")
+                    await channel.send(view=view, file=welcome_file)
+                else:
+                    view = build_welcome_view(msg, None)
+                    await channel.send(view=view)
+            except discord.Forbidden:
+                pass
+
+    config = get_raid_config(gid)
+    if not config["enabled"]:
+        return
+
+    wl = config.get("whitelist", [])
+    if any(r.id in wl for r in member.roles):
+        return
+
+    bl = config.get("blacklist", [])
+    if member.id in bl:
+        try:
+            await member.ban(reason="Blacklist")
+            await raid_log_send(member.guild, config, [
+                f"**BLACKLIST** — {member.mention} (`{member.id}`)",
+                f"**Action** Ban automatique (ID blackliste)"
+            ])
+        except discord.Forbidden:
+            pass
+        return
+
+    score = 0
+    reasons = []
+    now = datetime.now(timezone.utc)
+    account_age = now - member.created_at
+
+    if config["anti_bot_join"] and member.bot:
+        try:
+            await member.ban(reason="Anti-bot join (raid)")
+            await raid_log_send(member.guild, config, [
+                f"**BOT JOIN** — `{member.name}` (`{member.id}`)",
+                f"**Action** Ban automatique (bot rejoint)"
+            ])
+        except discord.Forbidden:
+            pass
+        return
+
+    if config["anti_alt"] and account_age < timedelta(days=config["alt_max_age"]):
+        try:
+            await member.ban(reason=f"Anti-alt (compte < {config['alt_max_age']}j)")
+            await raid_log_send(member.guild, config, [
+                f"**ALT ACCOUNT** — {member.mention} (`{member.id}`)",
+                f"**Compte** {account_age.days}j (max: `{config['alt_max_age']}j`)",
+                f"**Action** Ban automatique"
+            ])
+        except discord.Forbidden:
+            pass
+        return
+
+    if account_age < timedelta(days=config["min_account_age"]):
+        s = min(15, (config["min_account_age"] - account_age.days) * 2)
+        score += s
+        reasons.append(f"Compte age {account_age.days}j (min: {config['min_account_age']}j)")
+
+    if config["check_avatar"] and is_default_avatar(member):
+        score += 5
+        reasons.append("Avatar par defaut")
+
+    join_tracker[gid].append(now)
+    join_tracker[gid] = [t for t in join_tracker[gid] if (now - t).total_seconds() < config["window"]]
+
+    if len(join_tracker[gid]) > config["max_joins"]:
+        flood_score = min(20, (len(join_tracker[gid]) - config["max_joins"]) * 3)
+        score += flood_score
+        reasons.append(f"Flood: {len(join_tracker[gid])} joins en {config['window']}s")
+
+    if config["check_name"]:
+        name_history[gid].append(member.display_name)
+        name_history[gid] = name_history[gid][-50:]
+        name_score = calculate_name_score(member.display_name, name_history[gid][:-1])
+        if name_score > 0:
+            score += name_score
+            reasons.append(f"Nom similaire (score: {name_score})")
+
+    if score > 0:
+        if score >= config["score_kick"]:
+            await handle_raid_action(member, config, reasons, score)
+        else:
+            await raid_log_send(member.guild, config, [
+                f"**SUSPECT** — {member.mention} (`{member.id}`)",
+                f"**Score** `{score}/{config['score_kick']}`",
+                f"**Raisons** {' | '.join(reasons)}",
+                f"**Compte** <t:{int(member.created_at.timestamp())}:R>",
+            ])
+
+
+@bot.event
+async def on_member_remove(member: discord.Member):
+    gid = str(member.guild.id)
+    cfg = get_log_config(gid)
+    if cfg["member_leave"]:
+        roles = ", ".join(r.mention for r in member.roles[1:]) or "Aucun"
+        await log_send(member.guild, cfg, "Member Leave", [
+            f"**Membre** {member.display_name} (`{member.id}`)",
+            f"**Roles** {roles}",
+            f"**Membres** `{member.guild.member_count}`",
+        ])
+
+    settings = load_settings()
+    s = settings.get(gid, {})
+    goodbye_channel_id = s.get("goodbye_channel")
+    if goodbye_channel_id:
+        channel = member.guild.get_channel(int(goodbye_channel_id))
+        if channel:
+            msg = s.get("goodbye_message", "**{user}** a quitté **{server}**.")
+            msg = msg.replace("{user}", member.display_name).replace("{server}", member.guild.name).replace("{count}", str(member.guild.member_count))
+            try:
+                if s.get("goodbye_image", True):
+                    goodbye_file = await generate_goodbye_image(member)
+                    view = build_goodbye_view(msg, "goodbye.png")
+                    await channel.send(view=view, file=goodbye_file)
+                else:
+                    view = build_goodbye_view(msg, None)
+                    await channel.send(view=view)
+            except discord.Forbidden:
+                pass
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    gid = str(before.guild.id)
+    cfg = get_log_config(gid)
+
+    if before.premium_since is None and after.premium_since is not None:
+        settings = load_settings()
+        s = settings.get(gid, {})
+        boost_channel_id = s.get("boost_channel")
+        if boost_channel_id:
+            channel = after.guild.get_channel(int(boost_channel_id))
+            if channel:
+                msg = s.get("boost_message", "**{user}** a booste **{server}** !")
+                boost_count = after.guild.premium_subscription_count or 0
+                msg = msg.replace("{user}", after.mention).replace("{server}", after.guild.name).replace("{boosts}", str(boost_count))
+                try:
+                    if s.get("boost_image", True):
+                        boost_file = await generate_boost_image(after)
+                        view = build_boost_view(msg, "boost.png")
+                        await channel.send(view=view, file=boost_file)
+                    else:
+                        view = build_boost_view(msg, None)
+                        await channel.send(view=view)
+                except discord.Forbidden:
+                    pass
+
+    if not cfg["member_update"]:
+        return
+
+    changes = []
+    if before.roles != after.roles:
+        old_roles = set(r.id for r in before.roles)
+        new_roles = set(r.id for r in after.roles)
+        added = [r.mention for r in after.roles if r.id in new_roles - old_roles]
+        removed = [r.mention for r in before.roles if r.id in old_roles - new_roles]
+        if added:
+            changes.append(f"**Roles ajoutes** {', '.join(added)}")
+        if removed:
+            changes.append(f"**Roles retires** {', '.join(removed)}")
+
+    if before.display_name != after.display_name:
+        changes.append(f"**Pseudo** `{before.display_name}` → `{after.display_name}`")
+
+    if before.nick != after.nick:
+        changes.append(f"**Nickname** `{before.nick or before.display_name}` → `{after.nick or after.display_name}`")
+
+    if changes:
+        await log_send(before.guild, cfg, "Member Update", [
+            f"**Membre** {before.mention} (`{before.id}`)",
+            *changes,
+        ])
+
+
+@bot.event
+async def on_guild_channel_create(channel):
+    gid = str(channel.guild.id)
+    cfg = get_log_config(gid)
+    if not cfg["channel_create"]:
+        return
+    await log_send(channel.guild, cfg, "Channel Create", [
+        f"**Salon** {channel.mention} (`{channel.id}`)",
+        f"**Type** `{channel.type}`",
+        f"**Categorie** `{channel.category}`",
+    ])
+
+
+@bot.event
+async def on_guild_channel_delete(channel):
+    gid = str(channel.guild.id)
+    cfg = get_log_config(gid)
+    if not cfg["channel_delete"]:
+        return
+    await log_send(channel.guild, cfg, "Channel Delete", [
+        f"**Salon** `{channel.name}` (`{channel.id}`)",
+        f"**Type** `{channel.type}`",
+    ])
+
+
+@bot.event
+async def on_guild_channel_update(before, after):
+    gid = str(before.guild.id)
+    cfg = get_log_config(gid)
+    if not cfg["channel_update"]:
+        return
+    changes = []
+    if before.name != after.name:
+        changes.append(f"**Nom** `{before.name}` → `{after.name}`")
+    if before.topic != after.topic:
+        changes.append(f"**Sujet** `{(before.topic or '')[:100]}` → `{(after.topic or '')[:100]}`")
+    if changes:
+        await log_send(before.guild, cfg, "Channel Update", [
+            f"**Salon** {after.mention}",
+            *changes,
+        ])
+
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    gid = str(member.guild.id)
+    cfg = get_log_config(gid)
+
+    if before.channel != after.channel:
+        if before.channel is None and after.channel:
+            if cfg["voice_join"]:
+                await log_send(member.guild, cfg, "Voice Join", [
+                    f"**Membre** {member.mention}",
+                    f"**Salon** {after.channel.mention}",
+                ])
+        elif before.channel and after.channel is None:
+            if cfg["voice_leave"]:
+                await log_send(member.guild, cfg, "Voice Leave", [
+                    f"**Membre** {member.mention}",
+                    f"**Salon** {before.channel.mention}",
+                ])
+        elif before.channel and after.channel:
+            if cfg["voice_move"]:
+                await log_send(member.guild, cfg, "Voice Move", [
+                    f"**Membre** {member.mention}",
+                    f"**De** {before.channel.mention}",
+                    f"**Vers** {after.channel.mention}",
+                ])
+
+
+@bot.event
+async def on_guild_role_create(role):
+    gid = str(role.guild.id)
+    cfg = get_log_config(gid)
+    if not cfg["role_create"]:
+        return
+    await log_send(role.guild, cfg, "Role Create", [
+        f"**Role** {role.mention} (`{role.id}`)",
+        f"**Couleur** `{role.color}`",
+        f"**Position** `{role.position}`",
+    ])
+
+
+@bot.event
+async def on_guild_role_delete(role):
+    gid = str(role.guild.id)
+    cfg = get_log_config(gid)
+    if not cfg["role_delete"]:
+        return
+    await log_send(role.guild, cfg, "Role Delete", [
+        f"**Role** `{role.name}` (`{role.id}`)",
+    ])
+
+
+@bot.event
+async def on_member_ban(guild, user):
+    gid = str(guild.id)
+    cfg = get_log_config(gid)
+    if not cfg["ban"]:
+        return
+    await log_send(guild, cfg, "Ban", [
+        f"**Utilisateur** {user.mention} (`{user.id}`)",
+        f"**Nom** `{user.name}`",
+    ])
+
+
+@bot.event
+async def on_member_unban(guild, user):
+    gid = str(guild.id)
+    cfg = get_log_config(gid)
+    if not cfg["unban"]:
+        return
+    await log_send(guild, cfg, "Unban", [
+        f"**Utilisateur** {user.mention} (`{user.id}`)",
+        f"**Nom** `{user.name}`",
+    ])
+
+
+log = app_commands.Group(name="log", description="Configuration des logs")
+
+
+@log.command(name="config", description="Configurer les logs")
+@app_commands.describe(
+    channel="Salon de logs",
+    enabled="Activer/desactiver",
+)
+@admin_or_owner()
+async def log_config_cmd(interaction: discord.Interaction, channel: discord.TextChannel = None, enabled: str = None):
+    gid = str(interaction.guild.id)
+    settings = load_settings()
+    if gid not in settings:
+        settings[gid] = {}
+    if channel:
+        settings[gid]["log_channel"] = channel.id
+    if enabled:
+        settings[gid]["log_enabled"] = enabled == "on"
+    save_settings(settings)
+    await interaction.response.send_message(f"Logs configures dans {channel.mention if channel else 'inchangement'}.")
+
+
+@log.command(name="toggle", description="Activer/desactiver un type de log")
+@app_commands.describe(
+    log_type="Type de log a toggle",
+    state="on ou off",
+)
+@app_commands.choices(
+    log_type=[
+        app_commands.Choice(name="message_edit", value="message_edit"),
+        app_commands.Choice(name="message_delete", value="message_delete"),
+        app_commands.Choice(name="member_join", value="member_join"),
+        app_commands.Choice(name="member_leave", value="member_leave"),
+        app_commands.Choice(name="member_update", value="member_update"),
+        app_commands.Choice(name="channel_create", value="channel_create"),
+        app_commands.Choice(name="channel_delete", value="channel_delete"),
+        app_commands.Choice(name="channel_update", value="channel_update"),
+        app_commands.Choice(name="voice_join", value="voice_join"),
+        app_commands.Choice(name="voice_leave", value="voice_leave"),
+        app_commands.Choice(name="voice_move", value="voice_move"),
+        app_commands.Choice(name="role_create", value="role_create"),
+        app_commands.Choice(name="role_delete", value="role_delete"),
+        app_commands.Choice(name="ban", value="ban"),
+        app_commands.Choice(name="unban", value="unban"),
+        app_commands.Choice(name="automod", value="automod"),
+    ],
+    state=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
+)
+@admin_or_owner()
+async def log_toggle(interaction: discord.Interaction, log_type: str, state: str):
+    gid = str(interaction.guild.id)
+    settings = load_settings()
+    if gid not in settings:
+        settings[gid] = {}
+    settings[gid][f"log_{log_type}"] = state == "on"
+    save_settings(settings)
+    status = "active" if state == "on" else "desactive"
+    await interaction.response.send_message(f"Log `{log_type}` {status}.")
+
+
+@log.command(name="status", description="Voir la config des logs")
+async def log_status(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    cfg = get_log_config(gid)
+    channel = f"<#{cfg['channel']}>" if cfg["channel"] else "Non configure"
+    on_off = lambda x: "ON" if x else "OFF"
+    view = view_text(
+        "## Logs — Status",
+        f"**Etat** `{on_off(cfg['enabled'])}`",
+        f"**Salon** {channel}",
+        "",
+        f"**Messages** Edit: `{on_off(cfg['message_edit'])}` | Delete: `{on_off(cfg['message_delete'])}`",
+        f"**Membres** Join: `{on_off(cfg['member_join'])}` | Leave: `{on_off(cfg['member_leave'])}` | Update: `{on_off(cfg['member_update'])}`",
+        f"**Salons** Create: `{on_off(cfg['channel_create'])}` | Delete: `{on_off(cfg['channel_delete'])}` | Update: `{on_off(cfg['channel_update'])}`",
+        f"**Voice** Join: `{on_off(cfg['voice_join'])}` | Leave: `{on_off(cfg['voice_leave'])}` | Move: `{on_off(cfg['voice_move'])}`",
+        f"**Roles** Create: `{on_off(cfg['role_create'])}` | Delete: `{on_off(cfg['role_delete'])}`",
+        f"**Mod** Ban: `{on_off(cfg['ban'])}` | Unban: `{on_off(cfg['unban'])}` | Automod: `{on_off(cfg['automod'])}`",
+    )
+    await interaction.response.send_message(view=view)
+
+
+# ──────────────────────────────────────────────
+#  POLL SYSTEM (IMPROVED)
+# ──────────────────────────────────────────────
+
+active_polls = {}
+
+poll_cmd = app_commands.Group(name="poll", description="Sondages avances")
+
+
+@poll_cmd.command(name="create", description="Creer un sondage")
+@app_commands.describe(
+    question="La question",
+    options="Options separees par ; (ex: Oui ; Non ; Peut-etre)",
+    anonymous="Votes anonymes (oui/non)",
+    duration="Duree en secondes (optionnel)",
+)
+@app_commands.choices(anonymous=[
+    app_commands.Choice(name="oui", value="yes"),
+    app_commands.Choice(name="non", value="no"),
+])
+async def poll_create(interaction: discord.Interaction, question: str, options: str, anonymous: str = "no", duration: int = None):
+    opts = [o.strip() for o in options.split(";") if o.strip()]
+    if len(opts) < 2:
+        await interaction.response.send_message("Minimum 2 options.", ephemeral=True)
+        return
+    if len(opts) > 10:
+        await interaction.response.send_message("Maximum 10 options.", ephemeral=True)
+        return
+
+    is_anonymous = anonymous == "yes"
+    emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+    desc_lines = []
+    for i, opt in enumerate(opts):
+        desc_lines.append(f"{emojis[i]} {opt}")
+    if duration:
+        end_time = int(_time.time()) + duration
+        desc_lines.append(f"\n**Termine :** <t:{end_time}:R>")
+
+    embed = discord.Embed(
+        title=f"Sondage — {question}",
+        description="\n".join(desc_lines),
+        color=0x3498db,
+    )
+    embed.set_footer(text=f"Vote avec les reactions | {'Anonyme' if is_anonymous else 'Public'} | Par {interaction.user.display_name}")
+
+    msg = await interaction.channel.send(embed=embed)
+    for i in range(len(opts)):
+        await msg.add_reaction(emojis[i])
+
+    active_polls[str(msg.id)] = {
+        "guild_id": str(interaction.guild.id),
+        "question": question,
+        "options": opts,
+        "anonymous": is_anonymous,
+        "creator": interaction.user.id,
+        "end_time": _time.time() + duration if duration else None,
+    }
+
+    await interaction.response.send_message("Sondage cree !", ephemeral=True)
+
+
+@poll_cmd.command(name="end", description="Terminer un sondage et afficher les resultats")
+@app_commands.describe(message_id="ID du message sondage")
+async def poll_end(interaction: discord.Interaction, message_id: str):
+    poll = active_polls.get(message_id)
+    if not poll:
+        await interaction.response.send_message("Sondage introuvable.", ephemeral=True)
+        return
+
+    try:
+        msg = await interaction.channel.fetch_message(int(message_id))
+    except discord.NotFound:
+        await interaction.response.send_message("Message introuvable.", ephemeral=True)
+        return
+
+    emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+    results = []
+    max_votes = 0
+    total = 0
+    for i, opt in enumerate(poll["options"]):
+        count = 0
+        for reaction in msg.reactions:
+            if str(reaction.emoji) == emojis[i]:
+                count = reaction.count - 1
+                break
+        results.append((opt, count))
+        max_votes = max(max_votes, count)
+        total += count
+
+    bar_len = 15
+    lines = []
+    for opt, count in results:
+        pct = (count / total * 100) if total > 0 else 0
+        filled = int((count / max_votes) * bar_len) if max_votes > 0 else 0
+        bar = "█" * filled + "░" * (bar_len - filled)
+        lines.append(f"**{opt}** — `{count}` votes ({pct:.0f}%)\n`{bar}`")
+
+    embed = discord.Embed(
+        title=f"Resultats — {poll['question']}",
+        description="\n\n".join(lines),
+        color=0x2ecc71,
+    )
+    embed.set_footer(text=f"Total : {total} votes")
+    await msg.reply(embed=embed)
+
+    if str(message_id) in active_polls:
+        del active_polls[str(message_id)]
+    await interaction.response.send_message("Resultats affiches !", ephemeral=True)
+
+
+@poll_cmd.command(name="list", description="Voir les sondages actifs")
+async def poll_list(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    active = []
+    for mid, poll in active_polls.items():
+        if poll["guild_id"] == gid:
+            remaining = ""
+            if poll["end_time"]:
+                rem = poll["end_time"] - _time.time()
+                if rem > 0:
+                    remaining = f" — {int(rem//60)}min restantes"
+            active.append(f"`{mid}` — **{poll['question']}**{remaining}")
+
+    if not active:
+        await interaction.response.send_message("Aucun sondage actif.", ephemeral=True)
+        return
+
+    view = view_text("## Sondages actifs", *active)
+    await interaction.response.send_message(view=view)
+
+
+# ──────────────────────────────────────────────
+#  LEVEL SYSTEM (CUSTOMIZABLE)
+# ──────────────────────────────────────────────
+
+def get_level_config(gid):
+    settings = load_settings()
+    s = settings.get(gid, {})
+    return {
+        "enabled": s.get("level_enabled", True),
+        "xp_per_msg": s.get("level_xp_per_msg", 15),
+        "xp_variance": s.get("level_xp_variance", 10),
+        "cooldown": s.get("level_cooldown", 60),
+        "level_channel": s.get("level_channel"),
+        "level_role_rewards": s.get("level_role_rewards", {}),
+        "level_up_message": s.get("level_up_message", "Felicitations {user} ! Tu es maintenant niveau **{level}** !"),
+        "double_xp_roles": s.get("level_double_xp_roles", []),
+    }
+
+
+msg_xp_cooldown = defaultdict(lambda: 0)
+
+
+@bot.event
+async def on_message_level(message):
+    if message.author.bot or not message.guild:
+        return
+    gid = str(message.guild.id)
+    cfg = get_level_config(gid)
+    if not cfg["enabled"]:
+        return
+
+    now = _time.time()
+    if now - msg_xp_cooldown[message.author.id] < cfg["cooldown"]:
+        return
+    msg_xp_cooldown[message.author.id] = now
+
+    eco, data = get_economy(gid, str(message.author.id))
+    xp_gain = cfg["xp_per_msg"] + _random.randint(0, cfg["xp_variance"])
+    if any(r.id in cfg["double_xp_roles"] for r in message.author.roles):
+        xp_gain *= 2
+    data["xp"] = data.get("xp", 0) + xp_gain
+
+    old_level = data.get("level", 1)
+    new_level = int((data["xp"] / 100) ** 0.5) + 1
+    data["level"] = new_level
+    save_economy_data(eco)
+
+    if new_level > old_level:
+        msg = cfg["level_up_message"].replace("{user}", message.author.mention).replace("{level}", str(new_level))
+        if cfg["level_channel"]:
+            channel = message.guild.get_channel(int(cfg["level_channel"]))
+            if channel:
+                await channel.send(msg)
+        else:
+            await message.channel.send(msg, delete_after=10)
+
+        rewards = cfg.get("level_role_rewards", {})
+        role_id = rewards.get(str(new_level))
+        if role_id:
+            role = message.guild.get_role(int(role_id))
+            if role:
+                try:
+                    await message.author.add_roles(role, reason=f"Niveau {new_level}")
+                except discord.Forbidden:
+                    pass
+
+
+level_cmd = app_commands.Group(name="level", description="Systeme de niveaux")
+
+
+@level_cmd.command(name="", description="Voir ton niveau")
+@app_commands.describe(member="Membre a inspecter")
+async def level_view(interaction: discord.Interaction, member: discord.Member = None):
+    target = member or interaction.user
+    gid = str(interaction.guild.id)
+    cfg = get_level_config(gid)
+    uid = str(target.id)
+    eco, data = get_economy(gid, uid)
+    level = data.get("level", 1)
+    xp = data.get("xp", 0)
+    xp_needed = (level - 1) ** 2 * 100
+    xp_next = level ** 2 * 100
+    progress = xp - xp_needed
+    needed = xp_next - xp_needed
+    pct = int((progress / needed) * 100) if needed > 0 else 0
+    bar_len = 20
+    filled = int((pct / 100) * bar_len)
+    bar = "█" * filled + "░" * (bar_len - filled)
+
+    view = view_text(
+        f"## Niveau de {target.display_name}",
+        f"**Niveau** `{level}`",
+        f"**XP** `{xp}` (prochain: `{xp_next}`)",
+        f"**Progression** [{bar}] `{pct}%`",
+    )
+    await interaction.response.send_message(view=view)
+
+
+@level_cmd.command(name="leaderboard", description="Classement des niveaux")
+async def level_leaderboard(interaction: discord.Interaction):
+    gid = str(interaction.guild.id)
+    eco = load_economy()
+    g = eco.get(gid, {})
+
+    if not g:
+        await interaction.response.send_message("Aucune donnee.", ephemeral=True)
+        return
+
+    sorted_users = sorted(g.items(), key=lambda x: x[1].get("xp", 0), reverse=True)[:15]
+    medals = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+    lines = []
+    for i, (uid, data) in enumerate(sorted_users):
+        member = interaction.guild.get_member(int(uid))
+        name = member.display_name if member else f"ID: {uid}"
+        level = data.get("level", 1)
+        xp = data.get("xp", 0)
+        medal = medals[i] if i < len(medals) else f"#{i+1}"
+        lines.append(f"{medal} **{name}** — Niv. `{level}` ({xp} XP)")
+
+    view = view_text("## Classement niveaux", *lines)
+    await interaction.response.send_message(view=view)
+
+
+@level_cmd.command(name="config", description="Configurer le systeme de niveaux")
+@app_commands.describe(
+    enabled="Activer/desactiver",
+    xp_per_msg="XP par message",
+    xp_variance="Variance d'XP (0-50)",
+    cooldown="Cooldown en secondes",
+    channel="Salon des niveaux",
+    level_up_msg="Message de level up ({user} et {level})",
+)
+@app_commands.choices(enabled=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")])
+@admin_or_owner()
+async def level_config_cmd(
+    interaction: discord.Interaction,
+    enabled: str = None,
+    xp_per_msg: int = None,
+    xp_variance: int = None,
+    cooldown: int = None,
+    channel: discord.TextChannel = None,
+    level_up_msg: str = None,
+):
+    gid = str(interaction.guild.id)
+    settings = load_settings()
+    if gid not in settings:
+        settings[gid] = {}
+    updated = []
+    if enabled is not None:
+        settings[gid]["level_enabled"] = enabled == "on"
+        updated.append(f"Etat: {enabled}")
+    if xp_per_msg is not None:
+        settings[gid]["level_xp_per_msg"] = xp_per_msg
+        updated.append(f"XP/msg: {xp_per_msg}")
+    if xp_variance is not None:
+        settings[gid]["level_xp_variance"] = xp_variance
+        updated.append(f"Variance: {xp_variance}")
+    if cooldown is not None:
+        settings[gid]["level_cooldown"] = cooldown
+        updated.append(f"Cooldown: {cooldown}s")
+    if channel:
+        settings[gid]["level_channel"] = channel.id
+        updated.append(f"Salon: {channel.mention}")
+    if level_up_msg:
+        settings[gid]["level_up_message"] = level_up_msg
+        updated.append(f"Message: {level_up_msg[:50]}...")
+    save_settings(settings)
+    if updated:
+        view = view_text("## Niveaux — Config", *updated)
+        await interaction.response.send_message(view=view)
+    else:
+        await interaction.response.send_message("Aucun parametre modifie.", ephemeral=True)
+
+
+@level_cmd.command(name="reward", description="Ajouter/supprimer une recompense de role par niveau")
+@app_commands.describe(
+    action="add ou remove",
+    level="Le niveau",
+    role="Le role",
+)
+@app_commands.choices(action=[app_commands.Choice(name="ajouter", value="add"), app_commands.Choice(name="supprimer", value="remove")])
+@admin_or_owner()
+async def level_reward(interaction: discord.Interaction, action: str, level: int, role: discord.Role = None):
+    gid = str(interaction.guild.id)
+    settings = load_settings()
+    if gid not in settings:
+        settings[gid] = {}
+    rewards = settings[gid].get("level_role_rewards", {})
+    if action == "add" and role:
+        rewards[str(level)] = role.id
+        settings[gid]["level_role_rewards"] = rewards
+        save_settings(settings)
+        await interaction.response.send_message(f"Role {role.mention} donne au niveau **{level}**.")
+    elif action == "remove":
+        if str(level) in rewards:
+            del rewards[str(level)]
+            settings[gid]["level_role_rewards"] = rewards
+            save_settings(settings)
+        await interaction.response.send_message(f"Recompense niveau **{level}** supprimee.")
+    else:
+        await interaction.response.send_message("Parametres invalides.", ephemeral=True)
+
+
+@level_cmd.command(name="double_xp", description="Ajouter/retirer un role double XP")
+@app_commands.describe(
+    action="add ou remove",
+    role="Le role",
+)
+@app_commands.choices(action=[app_commands.Choice(name="ajouter", value="add"), app_commands.Choice(name="supprimer", value="remove")])
+@admin_or_owner()
+async def level_double_xp(interaction: discord.Interaction, action: str, role: discord.Role):
+    gid = str(interaction.guild.id)
+    settings = load_settings()
+    if gid not in settings:
+        settings[gid] = {}
+    dxp = settings[gid].get("level_double_xp_roles", [])
+    if action == "add":
+        if role.id not in dxp:
+            dxp.append(role.id)
+            settings[gid]["level_double_xp_roles"] = dxp
+            save_settings(settings)
+        await interaction.response.send_message(f"{role.mention} a double XP.")
+    else:
+        if role.id in dxp:
+            dxp.remove(role.id)
+            settings[gid]["level_double_xp_roles"] = dxp
+            save_settings(settings)
+        await interaction.response.send_message(f"{role.id} retire du double XP.")
+
+
+# ──────────────────────────────────────────────
 #  ANTI-NUKE DETECTION
 # ──────────────────────────────────────────────
 
@@ -5704,6 +6784,11 @@ async def on_message(message: discord.Message):
                                 pass
 
     await bot.process_commands(message)
+
+    try:
+        await on_message_level(message)
+    except Exception:
+        pass
 
     if not message.guild:
         return
@@ -6921,7 +8006,7 @@ async def ai_panel(interaction: discord.Interaction):
 # Les handlers ci-dessous ont été fusionnés dans celui du ticket/help.
 
 # ─── ENREGISTREMENT DES GROUPES ───
-for g in [mod, config, welcome, ticket, music, util, fun, backup, stats, raid, ghostping, ai]:
+for g in [mod, config, welcome, ticket, music, util, fun, backup, stats, raid, ghostping, ai, giveaway, poll_cmd, level_cmd, log]:
     bot.tree.add_command(g)
 
 bot.run(TOKEN)

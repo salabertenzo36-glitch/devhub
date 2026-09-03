@@ -215,6 +215,37 @@ TRANSLATIONS = {
         "eco_mining": "Mine",
         "eco_not_enough": "Pas assez de pieces",
         "eco_cooldown": "Tu dois attendre {time}.",
+
+        # Giveaway
+        "gw_created": "Giveaway cree dans {channel} !",
+        "gw_ended": "Giveaway termine.",
+        "gw_rerolled": "Gagnants relances : {winners}",
+        "gw_no_active": "Aucun giveaway actif.",
+        "gw_not_found": "Giveaway introuvable.",
+        "gw_no_participants": "Aucun participant.",
+
+        # Poll
+        "poll_created": "Sondage cree !",
+        "poll_ended": "Resultats affiches !",
+        "poll_not_found": "Sondage introuvable.",
+        "poll_no_active": "Aucun sondage actif.",
+        "poll_min_options": "Minimum 2 options.",
+        "poll_max_options": "Maximum 10 options.",
+
+        # Level
+        "level_title": "Niveaux — {user}",
+        "level_xp": "XP",
+        "level_next": "Prochain niveau",
+        "level_up": "Felicitations {user} ! Tu es maintenant niveau **{level}** !",
+        "level_role_reward": "Role {role} obtenu au niveau **{level}** !",
+        "level_no_data": "Aucune donnee de niveau.",
+        "level_leaderboard": "Classement niveaux",
+        "level_config_updated": "Config niveaux mise a jour.",
+
+        # Log
+        "log_configured": "Logs configures dans {channel}.",
+        "log_toggled": "Log `{type}` {status}.",
+        "log_no_channel": "Aucun salon de logs configure.",
     },
     "en": {
         # General
@@ -432,6 +463,37 @@ TRANSLATIONS = {
         "eco_mining": "Mining",
         "eco_not_enough": "Not enough coins",
         "eco_cooldown": "You must wait {time}.",
+
+        # Giveaway
+        "gw_created": "Giveaway created in {channel}!",
+        "gw_ended": "Giveaway ended.",
+        "gw_rerolled": "Winners rerolled: {winners}",
+        "gw_no_active": "No active giveaways.",
+        "gw_not_found": "Giveaway not found.",
+        "gw_no_participants": "No participants.",
+
+        # Poll
+        "poll_created": "Poll created!",
+        "poll_ended": "Results displayed!",
+        "poll_not_found": "Poll not found.",
+        "poll_no_active": "No active polls.",
+        "poll_min_options": "Minimum 2 options.",
+        "poll_max_options": "Maximum 10 options.",
+
+        # Level
+        "level_title": "Levels — {user}",
+        "level_xp": "XP",
+        "level_next": "Next level",
+        "level_up": "Congratulations {user}! You are now level **{level}**!",
+        "level_role_reward": "Role {role} obtained at level **{level}**!",
+        "level_no_data": "No level data.",
+        "level_leaderboard": "Level Leaderboard",
+        "level_config_updated": "Level config updated.",
+
+        # Log
+        "log_configured": "Logs configured in {channel}.",
+        "log_toggled": "Log `{type}` {status}.",
+        "log_no_channel": "No log channel configured.",
     },
     "de": {
         # General
@@ -649,6 +711,37 @@ TRANSLATIONS = {
         "eco_mining": "Bergbau",
         "eco_not_enough": "Nicht genug Muenzen",
         "eco_cooldown": "Du musst {time} warten.",
+
+        # Giveaway
+        "gw_created": "Giveaway erstellt in {channel}!",
+        "gw_ended": "Giveaway beendet.",
+        "gw_rerolled": "Gewinner neu gezogen: {winners}",
+        "gw_no_active": "Keine aktiven Giveaways.",
+        "gw_not_found": "Giveaway nicht gefunden.",
+        "gw_no_participants": "Keine Teilnehmer.",
+
+        # Poll
+        "poll_created": "Umfrage erstellt!",
+        "poll_ended": "Ergebnisse angezeigt!",
+        "poll_not_found": "Umfrage nicht gefunden.",
+        "poll_no_active": "Keine aktiven Umfragen.",
+        "poll_min_options": "Mindestens 2 Optionen.",
+        "poll_max_options": "Maximal 10 Optionen.",
+
+        # Level
+        "level_title": "Level — {user}",
+        "level_xp": "XP",
+        "level_next": "Naechstes Level",
+        "level_up": "Herzlichen Glueckwunsch {user}! Du bist jetzt Level **{level}**!",
+        "level_role_reward": "Rolle {role} erhalten ab Level **{level}**!",
+        "level_no_data": "Keine Level-Daten.",
+        "level_leaderboard": "Level-Rangliste",
+        "level_config_updated": "Level-Konfiguration aktualisiert.",
+
+        # Log
+        "log_configured": "Logs konfiguriert in {channel}.",
+        "log_toggled": "Log `{type}` {status}.",
+        "log_no_channel": "Kein Log-Kanal konfiguriert.",
     },
 }
 
