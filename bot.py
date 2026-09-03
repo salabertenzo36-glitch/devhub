@@ -4207,7 +4207,7 @@ async def on_message(message: discord.Message):
         return
     gid = str(message.guild.id)
     settings2 = load_settings()
-    if not settings2.get(gid, {}).get("ai_enabled"):
+    if not settings2.get(gid, {}).get("ai_enabled", True):
         return
     if bot.user in message.mentions:
         content = message.content.replace(f"<@{bot.user.id}>", "").replace(f"<@!{bot.user.id}>", "").strip()
@@ -5258,7 +5258,7 @@ async def ai_panel(interaction: discord.Interaction):
     settings = load_settings()
     gid = str(interaction.guild.id)
     s = settings.get(gid, {})
-    ai = "ON" if s.get("ai_enabled") else "OFF"
+    ai = "ON" if s.get("ai_enabled", True) else "OFF"
 
     view = discord.ui.LayoutView(timeout=120)
     container = discord.ui.Container(accent_colour=11581636)
