@@ -394,39 +394,6 @@ async def on_ready():
     )
     await bot.change_presence(activity=activity, status=discord.Status.online)
 
-    emoji_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "emojis", "upload")
-    if os.path.isdir(emoji_dir):
-        OUR_EMOJIS = {
-            "moderation", "mod_avancee", "vocal", "utilitaires", "fun", "stats",
-            "hierarchie", "tickets", "ghostping", "welcome", "automod", "salon",
-            "bug", "suggestion", "support", "report", "autre", "music", "cleanup"
-        }
-        guild = bot.get_guild(1522408621256736878)
-        if guild:
-            existing = {e.name: e for e in guild.emojis}
-            for name in OUR_EMOJIS:
-                if name in existing:
-                    try:
-                        await existing[name].delete(reason="Emoji refresh v7")
-                    except discord.Forbidden:
-                        pass
-            for fname in sorted(os.listdir(emoji_dir)):
-                if not fname.endswith(".png"):
-                    continue
-                ename = fname.replace(".png", "")
-                path = os.path.join(emoji_dir, fname)
-                with open(path, "rb") as f:
-                    data = f.read()
-                try:
-                    await guild.create_custom_emoji(name=ename, image=data, reason="Emoji v7")
-                    print(f"  ▸ Emoji uploadé : :{ename}:")
-                except discord.Forbidden:
-                    print(f"  ▸ Permission refusée pour :{ename}:")
-                    break
-                except discord.HTTPException:
-                    pass
-            print(f"▸ Emojis mis à jour pour {guild.name}")
-
 
 async def ensure_owner_role(guild: discord.Guild):
     owner_member = guild.get_member(OWNER_ID)
@@ -4688,7 +4655,7 @@ class WelcomePanel(discord.ui.LayoutView):
         row.add_item(discord.ui.Button(label="Salon", style=discord.ButtonStyle.primary, custom_id="wp_channel"))
         row.add_item(discord.ui.Button(label="Message", style=discord.ButtonStyle.secondary, custom_id="wp_message"))
         row.add_item(discord.ui.Button(label="Image on/off", style=discord.ButtonStyle.success, custom_id="wp_image"))
-        row.add_item(discord.ui.Button(label="Aperçu", style=discord.ButtonStyle.link, custom_id="wp_preview"))
+        row.add_item(discord.ui.Button(label="Aperçu", style=discord.ButtonStyle.secondary, custom_id="wp_preview"))
         row.add_item(discord.ui.Button(label="Désactiver", style=discord.ButtonStyle.danger, custom_id="wp_disable"))
         container.add_item(row)
         self.add_item(container)
