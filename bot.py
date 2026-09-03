@@ -3477,7 +3477,7 @@ async def boost(interaction: discord.Interaction, action: str, channel: discord.
 #  AUTOMOD (ANTI-LINK / ANTI-SPAM)
 # ──────────────────────────────────────────────
 
-LINK_REGEX = r"https?://\S+|www\.\S+"
+LINK_REGEX = r"https?://\S+|www\.\S+|discord\.gg/\S+|dsc\.gg/\S+|t\.me/\S+"
 user_message_cache = defaultdict(list)
 
 
