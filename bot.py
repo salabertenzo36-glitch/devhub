@@ -923,7 +923,7 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_modal(modal)
 
     # --- RAID PANEL BUTTONS ---
-    elif cid in ("raid_on", "raid_off", "raid_lockdown", "raid_scan", "raid_massban"):
+    elif cid.startswith("raid_"):
         gid = str(interaction.guild.id) if interaction.guild else None
         if not gid:
             await interaction.response.send_message("Erreur.", ephemeral=True)
@@ -933,13 +933,26 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_message("Permission requise : Administrateur.", ephemeral=True)
             return
 
-        if cid == "raid_on":
-            save_raid_config(gid, {"anti_raid": True})
-            await interaction.response.send_message("Anti-raid activé.", ephemeral=True)
-
-        elif cid == "raid_off":
-            save_raid_config(gid, {"anti_raid": False})
-            await interaction.response.send_message("Anti-raid desactive.", ephemeral=True)
+        # Toggle buttons
+        toggle_map = {
+            "raid_toggle": "anti_raid",
+            "raid_toggle_nuke": "raid_anti_nuke",
+            "raid_toggle_webhook": "raid_anti_webhook",
+            "raid_toggle_spam": "raid_anti_spam",
+            "raid_toggle_mention": "raid_anti_mention",
+            "raid_toggle_invite": "raid_anti_invite",
+            "raid_toggle_caps": "raid_anti_caps",
+            "raid_toggle_bot": "raid_anti_bot_join",
+            "raid_toggle_alt": "raid_anti_alt",
+        }
+        if cid in toggle_map:
+            config = get_raid_config(gid)
+            setting_key = toggle_map[cid]
+            current = config.get(setting_key.replace("raid_", ""), config.get(setting_key, False))
+            new_val = not current
+            save_raid_config(gid, {setting_key: new_val})
+            status = "active" if new_val else "desactive"
+            await interaction.response.send_message(f"`{setting_key}` {status}.", ephemeral=True)
 
         elif cid == "raid_lockdown":
             state_data = load_raid_state()
@@ -2018,7 +2031,7 @@ HELP_CATEGORIES = {
         "label": "Anti-raid",
         "emoji": "<:84795adminicon:1544381268295417917>",
         "commands": [
-            "`/raid config` — Configurer l'anti-raid intelligent",
+            "`/raid config` — Configurer l'anti-raid (10 protections)",
             "`/raid log` — Salon de logs",
             "`/raid status` — Voir la config",
             "`/raid whitelist` — Gerer la whitelist",
@@ -3700,6 +3713,7 @@ raid_scores = defaultdict(lambda: defaultdict(int))
 flagged_members = defaultdict(list)
 lockdown_channels = defaultdict(set)
 raid_state = load_raid_state()
+msg_tracker = defaultdict(lambda: defaultdict(list))
 
 def get_raid_config(gid):
     settings = load_settings()
@@ -3721,6 +3735,18 @@ def get_raid_config(gid):
         "anti_webhook": s.get("raid_anti_webhook", True),
         "verification_role": s.get("raid_verification_role"),
         "lockdown_overwrite": s.get("raid_lockdown_overwrite", True),
+        "anti_spam": s.get("raid_anti_spam", False),
+        "spam_limit": s.get("raid_spam_limit", 5),
+        "spam_window": s.get("raid_spam_window", 10),
+        "anti_mention": s.get("raid_anti_mention", False),
+        "mention_limit": s.get("raid_mention_limit", 5),
+        "anti_invite": s.get("raid_anti_invite", False),
+        "anti_caps": s.get("raid_anti_caps", False),
+        "caps_limit": s.get("raid_caps_limit", 70),
+        "caps_min_length": s.get("raid_caps_min_length", 10),
+        "anti_bot_join": s.get("raid_anti_bot_join", False),
+        "anti_alt": s.get("raid_anti_alt", False),
+        "alt_max_age": s.get("raid_alt_max_age", 1),
     }
 
 def levenshtein(s1, s2):
@@ -3824,6 +3850,16 @@ async def handle_raid_action(member, config, reasons, score):
     score_kick="Score pour kick (defaut: 10)",
     score_ban="Score pour ban (defaut: 20)",
     anti_nuke="Anti-nuke on/off",
+    anti_spam="Anti-spam on/off",
+    spam_limit="Messages max avant mute (defaut: 5)",
+    anti_mention="Anti-mention on/off",
+    mention_limit="Mentions max (defaut: 5)",
+    anti_invite="Anti-invite on/off",
+    anti_caps="Anti-caps on/off",
+    caps_limit="% caps min (defaut: 70)",
+    anti_bot="Anti-bot on/off",
+    anti_alt="Anti-alt on/off",
+    alt_age="Age max alt en jours (defaut: 1)",
 )
 @app_commands.choices(
     state=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
@@ -3833,9 +3869,15 @@ async def handle_raid_action(member, config, reasons, score):
         app_commands.Choice(name="timeout", value="timeout"),
     ],
     anti_nuke=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
+    anti_spam=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
+    anti_mention=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
+    anti_invite=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
+    anti_caps=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
+    anti_bot=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
+    anti_alt=[app_commands.Choice(name="on", value="on"), app_commands.Choice(name="off", value="off")],
 )
 @admin_or_owner()
-async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int = 5, window: int = 10, min_age: int = 7, action: str = "kick", score_kick: int = 10, score_ban: int = 20, anti_nuke: str = "on"):
+async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int = 5, window: int = 10, min_age: int = 7, action: str = "kick", score_kick: int = 10, score_ban: int = 20, anti_nuke: str = "on", anti_spam: str = "off", spam_limit: int = 5, anti_mention: str = "off", mention_limit: int = 5, anti_invite: str = "off", anti_caps: str = "off", caps_limit: int = 70, anti_bot: str = "off", anti_alt: str = "off", alt_age: int = 1):
     gid = str(interaction.guild.id)
     save_raid_config(gid, {
         "anti_raid": state == "on",
@@ -3846,8 +3888,19 @@ async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int
         "raid_score_kick": score_kick,
         "raid_score_ban": score_ban,
         "raid_anti_nuke": anti_nuke == "on",
+        "raid_anti_spam": anti_spam == "on",
+        "raid_spam_limit": spam_limit,
+        "raid_anti_mention": anti_mention == "on",
+        "raid_mention_limit": mention_limit,
+        "raid_anti_invite": anti_invite == "on",
+        "raid_anti_caps": anti_caps == "on",
+        "raid_caps_limit": caps_limit,
+        "raid_anti_bot_join": anti_bot == "on",
+        "raid_anti_alt": anti_alt == "on",
+        "raid_alt_max_age": alt_age,
     })
     status = "active" if state == "on" else "desactive"
+    on_off = lambda x: "ON" if x == "on" else "OFF"
     view = view_text(
         "## Anti-Raid — Configuration",
         f"**Etat** `{status}`",
@@ -3855,7 +3908,11 @@ async def anti_raid(interaction: discord.Interaction, state: str, max_joins: int
         f"**Age min compte** `{min_age}` jours",
         f"**Action** `{action}`",
         f"**Score kick** `{score_kick}` | **Score ban** `{score_ban}`",
-        f"**Anti-nuke** `{anti_nuke}`",
+        f"**Anti-nuke** `{on_off(anti_nuke)}` | **Anti-webhook** `ON`",
+        f"**Anti-spam** `{on_off(anti_spam)}` ({spam_limit} msg/10s)",
+        f"**Anti-mention** `{on_off(anti_mention)}` ({mention_limit} max)",
+        f"**Anti-invite** `{on_off(anti_invite)}` | **Anti-caps** `{on_off(anti_caps)}` ({caps_limit}%)",
+        f"**Anti-bot** `{on_off(anti_bot)}` | **Anti-alt** `{on_off(anti_alt)}` (<{alt_age}j)",
     )
     await interaction.response.send_message(view=view)
 
@@ -4034,14 +4091,19 @@ async def raid_status(interaction: discord.Interaction):
     bl_text = ", ".join(f"`{r}`" for r in bl) or "`Aucun`"
     status = "active" if config["enabled"] else "desactive"
     log_ch = f"<#{config['log_channel']}>" if config["log_channel"] else "`Non configure`"
+    on_off = lambda x: "ON" if x else "OFF"
     view = view_text(
         "## Anti-Raid — Status",
-        f"**Etat** `{status}`",
+        f"**Etat** `{on_off(config['enabled'])}`",
         f"**Max joins** `{config['max_joins']}` dans `{config['window']}s`",
         f"**Age min** `{config['min_account_age']}` jours",
         f"**Action** `{config['action']}`",
         f"**Score kick** `{config['score_kick']}` | **Score ban** `{config['score_ban']}`",
-        f"**Anti-nuke** `{config['anti_nuke']}`",
+        f"**Anti-nuke** `{on_off(config['anti_nuke'])}` | **Anti-webhook** `{on_off(config['anti_webhook'])}`",
+        f"**Anti-spam** `{on_off(config['anti_spam'])}` ({config['spam_limit']} msg/{config['spam_window']}s)",
+        f"**Anti-mention** `{on_off(config['anti_mention'])}` ({config['mention_limit']} max)",
+        f"**Anti-invite** `{on_off(config['anti_invite'])}` | **Anti-caps** `{on_off(config['anti_caps'])}` ({config['caps_limit']}%)",
+        f"**Anti-bot** `{on_off(config['anti_bot_join'])}` | **Anti-alt** `{on_off(config['anti_alt'])}` (<{config['alt_max_age']}j)",
         f"**Log** {log_ch}",
         f"**Whitelist** {wl_text}",
         f"**Blacklist** {bl_text}",
@@ -4054,28 +4116,58 @@ async def raid_status(interaction: discord.Interaction):
 async def raid_panel(interaction: discord.Interaction):
     gid = str(interaction.guild.id)
     config = get_raid_config(gid)
-    status = "ON" if config["enabled"] else "OFF"
+
+    def on_off(val):
+        return "ON" if val else "OFF"
+
+    def style(val):
+        return discord.ButtonStyle.success if val else discord.ButtonStyle.danger
+
     view = discord.ui.LayoutView(timeout=120)
     container = discord.ui.Container(accent_colour=11581636)
     container.add_item(discord.ui.TextDisplay("## Panel Anti-Raid Intelligent"))
+
+    # Main info
     container.add_item(discord.ui.TextDisplay(
-        f"**Etat :** {status}\n"
-        f"**Max joins :** {config['max_joins']} dans {config['window']}s\n"
-        f"**Age min :** {config['min_account_age']} jours\n"
-        f"**Action :** {config['action']}\n"
-        f"**Score kick :** {config['score_kick']} | **Score ban :** {config['score_ban']}\n"
-        f"**Anti-nuke :** {config['anti_nuke']}\n"
-        f"**Detection par score cumulatif** — Chaque signal suspect ajoute des points"
+        f"**General** — Anti-raid: `{on_off(config['enabled'])}` | Action: `{config['action']}`\n"
+        f"Flood: `{config['max_joins']}` joins / `{config['window']}s` | Age min: `{config['min_account_age']}j`\n"
+        f"Score: kick `{config['score_kick']}` | ban `{config['score_ban']}`"
     ))
-    row = discord.ui.ActionRow()
-    row.add_item(discord.ui.Button(label="Activer", style=discord.ButtonStyle.success, custom_id="raid_on"))
-    row.add_item(discord.ui.Button(label="Desactiver", style=discord.ButtonStyle.danger, custom_id="raid_off"))
-    row.add_item(discord.ui.Button(label="Lockdown", style=discord.ButtonStyle.secondary, custom_id="raid_lockdown"))
-    container.add_item(row)
+
+    # Row 1: Main toggle + Lockdown + Scan + Massban
+    row1 = discord.ui.ActionRow()
+    row1.add_item(discord.ui.Button(label="Anti-raid", style=style(config["enabled"]), custom_id="raid_toggle"))
+    row1.add_item(discord.ui.Button(label="Lockdown", style=discord.ButtonStyle.secondary, custom_id="raid_lockdown"))
+    row1.add_item(discord.ui.Button(label="Scan", style=discord.ButtonStyle.secondary, custom_id="raid_scan"))
+    row1.add_item(discord.ui.Button(label="Massban", style=discord.ButtonStyle.danger, custom_id="raid_massban"))
+    container.add_item(row1)
+
+    # Protections title
+    container.add_item(discord.ui.TextDisplay("## Protections"))
+
+    # Row 2: Anti-nuke + Anti-webhook + Anti-spam + Anti-mention
     row2 = discord.ui.ActionRow()
-    row2.add_item(discord.ui.Button(label="Scan", style=discord.ButtonStyle.secondary, custom_id="raid_scan"))
-    row2.add_item(discord.ui.Button(label="Massban", style=discord.ButtonStyle.danger, custom_id="raid_massban"))
+    row2.add_item(discord.ui.Button(label=f"Anti-nuke {on_off(config['anti_nuke'])}", style=style(config["anti_nuke"]), custom_id="raid_toggle_nuke"))
+    row2.add_item(discord.ui.Button(label=f"Anti-webhook {on_off(config['anti_webhook'])}", style=style(config["anti_webhook"]), custom_id="raid_toggle_webhook"))
+    row2.add_item(discord.ui.Button(label=f"Anti-spam {on_off(config['anti_spam'])}", style=style(config["anti_spam"]), custom_id="raid_toggle_spam"))
+    row2.add_item(discord.ui.Button(label=f"Anti-mention {on_off(config['anti_mention'])}", style=style(config["anti_mention"]), custom_id="raid_toggle_mention"))
     container.add_item(row2)
+
+    # Row 3: Anti-invite + Anti-caps + Anti-bot + Anti-alt
+    row3 = discord.ui.ActionRow()
+    row3.add_item(discord.ui.Button(label=f"Anti-invite {on_off(config['anti_invite'])}", style=style(config["anti_invite"]), custom_id="raid_toggle_invite"))
+    row3.add_item(discord.ui.Button(label=f"Anti-caps {on_off(config['anti_caps'])}", style=style(config["anti_caps"]), custom_id="raid_toggle_caps"))
+    row3.add_item(discord.ui.Button(label=f"Anti-bot {on_off(config['anti_bot_join'])}", style=style(config["anti_bot_join"]), custom_id="raid_toggle_bot"))
+    row3.add_item(discord.ui.Button(label=f"Anti-alt {on_off(config['anti_alt'])}", style=style(config["anti_alt"]), custom_id="raid_toggle_alt"))
+    container.add_item(row3)
+
+    # Thresholds info
+    container.add_item(discord.ui.TextDisplay(
+        f"**Seuils** — Spam: `{config['spam_limit']}` msg / `{config['spam_window']}s` | "
+        f"Mentions: `{config['mention_limit']}` | Caps: `{config['caps_limit']}%` | "
+        f"Alt age: `<{config['alt_max_age']}j`"
+    ))
+
     view.add_item(container)
     await interaction.response.send_message(view=view, ephemeral=True)
 
@@ -4176,30 +4268,111 @@ async def on_message(message: discord.Message):
                 except discord.Forbidden:
                     pass
 
-    if guild_settings.get("anti-spam"):
-        now = time.time()
-        cache_key = f"{message.author.id}_{message.channel.id}"
-        user_message_cache[cache_key].append(now)
-        user_message_cache[cache_key] = [
-            t for t in user_message_cache[cache_key] if now - t < 5
-        ]
-        if len(user_message_cache[cache_key]) >= 5:
-            perms = message.channel.permissions_for(message.author)
-            if not perms.administrator:
-                try:
-                    await message.delete()
-                except discord.Forbidden:
-                    pass
-                try:
-                    until = datetime.now(timezone.utc) + timedelta(minutes=5)
-                    await message.author.timeout(until, reason="Anti-spam")
-                    await message.channel.send(
-                        f"**{message.author.display_name}** mute 5 minutes pour spam.",
-                        delete_after=5
-                    )
-                    await log_mod(message.guild, "Auto-Mute (anti-spam)", bot.user, message.author, "Spam detecte")
-                except (discord.Forbidden, discord.HTTPException):
-                    pass
+    if message.guild:
+        gid = str(message.guild.id)
+        rc = get_raid_config(gid)
+        if rc["enabled"]:
+            now = datetime.now(timezone.utc)
+            wl = rc.get("whitelist", [])
+            if not any(r.id in wl for r in message.author.roles):
+                # Anti-spam (message repetition)
+                if rc["anti_spam"]:
+                    msg_tracker[gid][message.author.id].append((now, message.content))
+                    msg_tracker[gid][message.author.id] = [
+                        (t, c) for t, c in msg_tracker[gid][message.author.id]
+                        if (now - t).total_seconds() < rc["spam_window"]
+                    ]
+                    if len(msg_tracker[gid][message.author.id]) >= rc["spam_limit"]:
+                        try:
+                            await message.delete()
+                        except discord.Forbidden:
+                            pass
+                        try:
+                            until = now + timedelta(minutes=5)
+                            await message.author.timeout(until, reason="Anti-spam (raid)")
+                            await message.channel.send(
+                                f"**{message.author.display_name}** mute 5 min — spam detecte.",
+                                delete_after=8
+                            )
+                            await raid_log_send(message.guild, rc, [
+                                f"**SPAM** — {message.author.mention} (`{message.author.id}`)",
+                                f"**Messages** `{len(msg_tracker[gid][message.author.id])}` en `{rc['spam_window']}s`",
+                                f"**Action** Timeout 5 min"
+                            ])
+                            msg_tracker[gid][message.author.id].clear()
+                        except (discord.Forbidden, discord.HTTPException):
+                            pass
+
+                # Anti-mention (mass mentions)
+                if rc["anti_mention"] and message.mentions:
+                    if len(message.mentions) >= rc["mention_limit"]:
+                        try:
+                            await message.delete()
+                        except discord.Forbidden:
+                            pass
+                        try:
+                            until = now + timedelta(minutes=5)
+                            await message.author.timeout(until, reason="Anti-mention (raid)")
+                            await message.channel.send(
+                                f"**{message.author.display_name}** mute 5 min — mass mentions.",
+                                delete_after=8
+                            )
+                            await raid_log_send(message.guild, rc, [
+                                f"**MASS MENTION** — {message.author.mention} (`{message.author.id}`)",
+                                f"**Mentions** `{len(message.mentions)}` (limite: `{rc['mention_limit']}`)",
+                                f"**Action** Timeout 5 min"
+                            ])
+                        except (discord.Forbidden, discord.HTTPException):
+                            pass
+
+                # Anti-invite (invite link spam)
+                if rc["anti_invite"] and message.content:
+                    invite_pattern = re.compile(r'(discord\.gg|dsc\.gg|discord\.com/invite)/\w+', re.IGNORECASE)
+                    if invite_pattern.search(message.content):
+                        try:
+                            await message.delete()
+                        except discord.Forbidden:
+                            pass
+                        try:
+                            until = now + timedelta(minutes=10)
+                            await message.author.timeout(until, reason="Anti-invite (raid)")
+                            await message.channel.send(
+                                f"**{message.author.display_name}** mute 10 min — lien d'invitation.",
+                                delete_after=8
+                            )
+                            await raid_log_send(message.guild, rc, [
+                                f"**INVITE** — {message.author.mention} (`{message.author.id}`)",
+                                f"**Lien** `{message.content[:100]}`",
+                                f"**Action** Timeout 10 min"
+                            ])
+                        except (discord.Forbidden, discord.HTTPException):
+                            pass
+
+                # Anti-caps (excessive caps)
+                if rc["anti_caps"] and message.content:
+                    text = re.sub(r'[^a-zA-Z]', '', message.content)
+                    if len(text) >= rc["caps_min_length"]:
+                        caps_count = sum(1 for c in text if c.isupper())
+                        caps_ratio = caps_count / len(text) * 100
+                        if caps_ratio >= rc["caps_limit"]:
+                            try:
+                                await message.delete()
+                            except discord.Forbidden:
+                                pass
+                            try:
+                                until = now + timedelta(minutes=2)
+                                await message.author.timeout(until, reason="Anti-caps (raid)")
+                                await message.channel.send(
+                                    f"**{message.author.display_name}** mute 2 min — caps abuse.",
+                                    delete_after=8
+                                )
+                                await raid_log_send(message.guild, rc, [
+                                    f"**CAPS** — {message.author.mention} (`{message.author.id}`)",
+                                    f"**Ratio** `{int(caps_ratio)}%` (limite: `{rc['caps_limit']}%`)",
+                                    f"**Action** Timeout 2 min"
+                                ])
+                            except (discord.Forbidden, discord.HTTPException):
+                                pass
 
     await bot.process_commands(message)
 
@@ -4351,6 +4524,31 @@ async def on_member_join(member: discord.Member):
     reasons = []
     now = datetime.now(timezone.utc)
     account_age = now - member.created_at
+
+    # Anti-bot join
+    if config["anti_bot_join"] and member.bot:
+        try:
+            await member.ban(reason="Anti-bot join (raid)")
+            await raid_log_send(member.guild, config, [
+                f"**BOT JOIN** — `{member.name}` (`{member.id}`)",
+                f"**Action** Ban automatique (bot rejoint)"
+            ])
+        except discord.Forbidden:
+            pass
+        return
+
+    # Anti-alt (new account)
+    if config["anti_alt"] and account_age < timedelta(days=config["alt_max_age"]):
+        try:
+            await member.ban(reason=f"Anti-alt (compte < {config['alt_max_age']}j)")
+            await raid_log_send(member.guild, config, [
+                f"**ALT ACCOUNT** — {member.mention} (`{member.id}`)",
+                f"**Compte** {account_age.days}j (max: `{config['alt_max_age']}j`)",
+                f"**Action** Ban automatique"
+            ])
+        except discord.Forbidden:
+            pass
+        return
 
     if account_age < timedelta(days=config["min_account_age"]):
         s = min(15, (config["min_account_age"] - account_age.days) * 2)
@@ -4671,7 +4869,7 @@ AI_RANDOM = [
 async def get_ai_response(message_content, user_name):
     try:
         import g4f
-        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n\nCommandes naturelles: Tu peux executer des actions en langage naturel via les mentions. Par exemple: \"mute @user\" mute le membre, \"ban @user\" le bannit, \"kick @user\" l'expulse, \"warn @user\" l'avertit, \"unwarn @user\" supprime ses warns, \"jail @user\" l'incarcere, \"unjail @user\" le libere, \"unban @user\" le débannit, \"envoie hello #channel\" envoie un message.\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-spam, anti-link (detecte discord.gg, dsc.gg, t.me), verification gate, lockdown.\nDonnees: MongoDB Atlas (pas de JSON).\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
+        prompt = f"[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n\nCommandes naturelles: Tu peux executer des actions en langage naturel via les mentions. Par exemple: \"mute @user\" mute le membre, \"ban @user\" le bannit, \"kick @user\" l'expulse, \"warn @user\" l'avertit, \"unwarn @user\" supprime ses warns, \"jail @user\" l'incarcere, \"unjail @user\" le libere, \"unban @user\" le débannit, \"envoie hello #channel\" envoie un message.\n\nProtections: anti-raid intelligent par score, anti-nuke, anti-webhook, anti-spam (message repetition), anti-mention (mass mentions), anti-invite (liens d'invitation), anti-caps (excessive majuscules), anti-bot (bots rejoint), anti-alt (comptes nouveaux), anti-link (detecte discord.gg, dsc.gg, t.me), verification gate, lockdown.\nDonnees: MongoDB Atlas (pas de JSON).\nConditions d'utilisation: gratuit, open source, pas de garantie 24/7.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:"
         response = g4f.ChatCompletion.create(
             model=g4f.models.gpt_4,
             messages=[
