@@ -4398,7 +4398,7 @@ async def on_message(message: discord.Message):
             response = await get_ai_response(content, message.author.display_name)
         if len(response) > 2000:
             response = response[:2000]
-        await message.channel.send(response)
+        await message.reply(response)
 
 
 @bot.event
