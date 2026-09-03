@@ -4213,6 +4213,14 @@ async def on_message(message: discord.Message):
         content = message.content.replace(f"<@{bot.user.id}>", "").replace(f"<@!{bot.user.id}>", "").strip()
         if not content:
             return
+        parsed = parse_natural_command(content, bot.user.id)
+        if parsed:
+            target_member = message.guild.get_member(int(parsed["target_id"]))
+            if target_member and target_member.id == bot.user.id:
+                await message.channel.send("Je peux pas m'auto-modérer.", delete_after=5)
+                return
+            await execute_natural_command(message, parsed)
+            return
         async with message.channel.typing():
             response = await get_ai_response(content, message.author.display_name)
         if len(response) > 2000:
@@ -4680,8 +4688,166 @@ async def get_ai_response(message_content, user_name):
     return "Je sais pas quoi dire la."
 
 
-# ──────────────────────────────────────────────
-#  PANELS DE CONFIGURATION INTERACTIFS
+import re as _re
+
+NATURAL_COMMANDS = {
+    "mute": {"action": "mute", "permission": "moderate_members"},
+    "unmute": {"action": "unmute", "permission": "moderate_members"},
+    "timeout": {"action": "timeout", "permission": "moderate_members"},
+    "kick": {"action": "kick", "permission": "kick_members"},
+    "ban": {"action": "ban", "permission": "ban_members"},
+    "unban": {"action": "unban", "permission": "ban_members"},
+    "softban": {"action": "softban", "permission": "ban_members"},
+    "warn": {"action": "warn", "permission": "moderate_members"},
+    "jail": {"action": "jail", "permission": "moderate_members"},
+}
+
+NATURAL_SYNONYMS = {
+    "mute": ["mute", "muet", "tais toi", "tais-toi", "ferme la", "calme"],
+    "kick": ["kick", "vire", "expulse", "degage", "dégage"],
+    "ban": ["ban", "bannis", "banish"],
+    "warn": ["warn", "avertis", "avertis"],
+    "timeout": ["timeout", "temp mute", "tempmute", "silence"],
+    "jail": ["jail", "prison", "incarcere"],
+}
+
+
+def parse_natural_command(content, bot_id):
+    content = content.strip()
+    content = content.replace(f"<@{bot_id}>", "").replace(f"<@!{bot_id}>", "").strip()
+
+    action = None
+    for cmd, synonyms in NATURAL_SYNONYMS.items():
+        for syn in synonyms:
+            if content.lower().startswith(syn + " ") or content.lower() == syn:
+                action = cmd
+                content = content[content.lower().find(syn) + len(syn):].strip()
+                break
+        if action:
+            break
+
+    if not action:
+        return None
+
+    target = None
+    target_match = _re.search(r'<@!?(\d+)>', content)
+    if target_match:
+        target = target_match.group(1)
+        content = content[:target_match.start()] + content[target_match.end():]
+    else:
+        return None
+
+    reason = content.strip()
+    if not reason:
+        reason = "Aucune raison"
+
+    return {"action": action, "target_id": target, "reason": reason}
+
+
+async def execute_natural_command(message, parsed):
+    guild = message.guild
+    if not guild:
+        return
+
+    action = parsed["action"]
+    target_id = int(parsed["target_id"])
+    reason = parsed["reason"]
+    member = guild.get_member(target_id)
+
+    await message.delete()
+
+    if action == "mute":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        until = datetime.now(timezone.utc) + timedelta(minutes=5)
+        await member.timeout(until, reason=reason)
+        await message.channel.send(f"**{member.display_name}** mute 5 min — {reason}", delete_after=8)
+        await log_mod(guild, "Mute (5 min)", message.author, member, reason)
+
+    elif action == "unmute":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        await member.timeout(None, reason=reason)
+        await message.channel.send(f"**{member.display_name}** unmute — {reason}", delete_after=8)
+        await log_mod(guild, "Unmute", message.author, member, reason)
+
+    elif action == "timeout":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        until = datetime.now(timezone.utc) + timedelta(minutes=10)
+        await member.timeout(until, reason=reason)
+        await message.channel.send(f"**{member.display_name}** timeout 10 min — {reason}", delete_after=8)
+        await log_mod(guild, "Timeout (10 min)", message.author, member, reason)
+
+    elif action == "kick":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        await member.kick(reason=reason)
+        await message.channel.send(f"**{member.display_name}** kick — {reason}", delete_after=8)
+        await log_mod(guild, "Kick", message.author, member, reason)
+
+    elif action == "ban":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        await member.ban(reason=reason)
+        await message.channel.send(f"**{member.display_name}** ban — {reason}", delete_after=8)
+        await log_mod(guild, "Ban", message.author, member, reason)
+
+    elif action == "softban":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        await member.ban(reason=reason)
+        await guild.unban(member, reason="Softban")
+        await message.channel.send(f"**{member.display_name}** softban — {reason}", delete_after=8)
+        await log_mod(guild, "Softban", message.author, member, reason)
+
+    elif action == "warn":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        warns = load_warns()
+        gid = str(guild.id)
+        if gid not in warns:
+            warns[gid] = {}
+        uid = str(target_id)
+        if uid not in warns[gid]:
+            warns[gid][uid] = []
+        warns[gid][uid].append({"reason": reason, "mod": str(message.author.id), "time": datetime.now(timezone.utc).isoformat()})
+        save_warns(warns)
+        count = len(warns[gid][uid])
+        await message.channel.send(f"**{member.display_name}** warn ({count}) — {reason}", delete_after=8)
+        await log_mod(guild, f"Warn ({count})", message.author, member, reason)
+
+    elif action == "jail":
+        if not member:
+            await message.channel.send("Membre introuvable.", delete_after=5)
+            return
+        jail_data = load_jail()
+        gid = str(guild.id)
+        if gid not in jail_data:
+            jail_data[gid] = {}
+        roles_backup = [r.id for r in member.roles[1:]]
+        jail_data[gid][str(target_id)] = {"roles": roles_backup, "time": datetime.now(timezone.utc).isoformat()}
+        save_jail(jail_data)
+        await member.edit(roles=[], reason="Jail")
+        await message.channel.send(f"**{member.display_name}** jail — {reason}", delete_after=8)
+        await log_mod(guild, "Jail", message.author, member, reason)
+
+    elif action == "unban":
+        try:
+            user = await bot.fetch_user(target_id)
+            ban = await guild.fetch_ban(user)
+            await guild.unban(user, reason=reason)
+            await message.channel.send(f"**{user.name}** unban — {reason}", delete_after=8)
+            await log_mod(guild, "Unban", message.author, user, reason)
+        except discord.NotFound:
+            await message.channel.send("Utilisateur non banni.", delete_after=5)
 # ──────────────────────────────────────────────
 
 # --- WELCOME PANEL ---
