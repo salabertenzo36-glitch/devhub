@@ -4213,7 +4213,7 @@ async def on_message(message: discord.Message):
         content = message.content.replace(f"<@{bot.user.id}>", "").replace(f"<@!{bot.user.id}>", "").strip()
         if not content:
             return
-        parsed = parse_natural_command(content, bot.user.id)
+        parsed = parse_natural_command(content, bot.user.id, message.guild)
         if parsed:
             target_member = message.guild.get_member(int(parsed["target_id"]))
             if target_member and target_member.id == bot.user.id:
@@ -4689,59 +4689,139 @@ async def get_ai_response(message_content, user_name):
 
 
 import re as _re
+import json as _json
 
-NATURAL_COMMANDS = {
-    "mute": {"action": "mute", "permission": "moderate_members"},
-    "unmute": {"action": "unmute", "permission": "moderate_members"},
-    "timeout": {"action": "timeout", "permission": "moderate_members"},
-    "kick": {"action": "kick", "permission": "kick_members"},
-    "ban": {"action": "ban", "permission": "ban_members"},
-    "unban": {"action": "unban", "permission": "ban_members"},
-    "softban": {"action": "softban", "permission": "ban_members"},
-    "warn": {"action": "warn", "permission": "moderate_members"},
-    "jail": {"action": "jail", "permission": "moderate_members"},
+
+ACTION_KEYWORDS = {
+    "mute":    ["mute", "muet", "muet", "tais toi", "tais-toi", "ferme la", "ferme", "calme", "calme toi", "silence", "bouche close", "shut up", "shut", "nique ta gueule"],
+    "unmute":  ["unmute", "démute", "demute", "peux parler", "parle", "retire le mute", "enleve le mute"],
+    "kick":    ["kick", "kicke", "vire", "viré", "expulse", "expulser", "degage", "dégage", "sort", "sors", "fait partir", "va t'en", "va dehors"],
+    "ban":     ["ban", "bannis", "banir", "banish", "perma", "ban def", "ban permanent", "détruit", "supprime"],
+    "unban":   ["unban", "débannis", "debannis", "retire le ban", "enleve le ban"],
+    "softban": ["softban", "soft ban", "ban temp", "ban temporaire"],
+    "warn":    ["warn", "avertis", "avertir", "attention", "premier avertissement", "strike", "strike"],
+    "jail":    ["jail", "jailer", "prison", "incarcere", "incarcérer", "met en prison", "enferme"],
 }
 
-NATURAL_SYNONYMS = {
-    "mute": ["mute", "muet", "tais toi", "tais-toi", "ferme la", "calme"],
-    "kick": ["kick", "vire", "expulse", "degage", "dégage"],
-    "ban": ["ban", "bannis", "banish"],
-    "warn": ["warn", "avertis", "avertis"],
-    "timeout": ["timeout", "temp mute", "tempmute", "silence"],
-    "jail": ["jail", "prison", "incarcere"],
+ACTION_MAP = {
+    "mute": "mute", "unmute": "unmute", "kick": "kick", "ban": "ban",
+    "unban": "unban", "softban": "softban", "warn": "warn", "jail": "jail",
+    "timeout": "mute",
 }
 
 
-def parse_natural_command(content, bot_id):
+def _fuzzy_match(text, keywords):
+    text_lower = text.lower()
+    for kw in keywords:
+        if kw in text_lower:
+            return True
+    words = text_lower.split()
+    for kw in keywords:
+        kw_words = kw.split()
+        for i in range(len(words)):
+            for j in range(len(kw_words)):
+                if i + j < len(words):
+                    if words[i + j] == kw_words[j]:
+                        continue
+                    else:
+                        break
+                else:
+                    break
+            else:
+                return True
+    return False
+
+
+def _extract_target_from_text(content, guild, bot_id):
+    mention_match = _re.search(r'<@!?(\d+)>', content)
+    if mention_match:
+        uid = int(mention_match.group(1))
+        if uid != bot_id:
+            return uid
+
+    content_lower = content.lower()
+    member = None
+    for m in guild.members:
+        if m.id == bot_id:
+            continue
+        name_lower = m.display_name.lower()
+        if name_lower in content_lower:
+            member = m
+            break
+        if m.name.lower() in content_lower:
+            member = m
+            break
+    if member:
+        return member.id
+
+    for m in guild.members:
+        if m.id == bot_id:
+            continue
+        name_lower = m.display_name.lower()
+        if any(w in content_lower for w in name_lower.split() if len(w) > 2):
+            member = m
+            break
+    if member:
+        return member.id
+
+    return None
+
+
+def _extract_reason(content, action_word):
+    cleaned = content.lower()
+    cleaned = _re.sub(r'<@!?\d+>', '', cleaned)
+    for syns in ACTION_KEYWORDS.values():
+        for syn in syns:
+            cleaned = cleaned.replace(syn, '')
+    cleaned = _re.sub(r'\s+', ' ', cleaned).strip()
+    if cleaned and len(cleaned) > 1:
+        return cleaned
+    return "Aucune raison"
+
+
+def parse_natural_command(content, bot_id, guild):
     content = content.strip()
     content = content.replace(f"<@{bot_id}>", "").replace(f"<@!{bot_id}>", "").strip()
 
+    if not content:
+        return None
+
     action = None
-    for cmd, synonyms in NATURAL_SYNONYMS.items():
-        for syn in synonyms:
-            if content.lower().startswith(syn + " ") or content.lower() == syn:
-                action = cmd
-                content = content[content.lower().find(syn) + len(syn):].strip()
-                break
-        if action:
+    action_word = None
+    for act, synonyms in ACTION_KEYWORDS.items():
+        if _fuzzy_match(content, synonyms):
+            action = ACTION_MAP.get(act, act)
+            for syn in synonyms:
+                if syn in content.lower():
+                    action_word = syn
+                    break
             break
+
+    if not action:
+        ai_hints = {
+            "mute": ["calme", "ferme", "tais", "bouche", "silence", "shut", "parle mal", "insulte", "chaotique", "toxique", "emmerde", "emmerde", "relou", "pourri", "ennuie"],
+            "kick": ["vire", "degage", "part", "sors", "pas bien", "probleme", "problème", "embête", "geule"],
+            "ban": ["detruit", "supprime", "def", "permanent", "trop loin", "abus", "hack", "nsfw", "raid"],
+            "warn": ["attention", "strike", "premier", "alerte", "1ere"],
+            "jail": ["prison", "enferme", "cache", "bloque"],
+        }
+        for act, hints in ai_hints.items():
+            if any(h in content.lower() for h in hints):
+                target_id = _extract_target_from_text(content, guild, bot_id)
+                if target_id:
+                    action = act
+                    break
 
     if not action:
         return None
 
-    target = None
-    target_match = _re.search(r'<@!?(\d+)>', content)
-    if target_match:
-        target = target_match.group(1)
-        content = content[:target_match.start()] + content[target_match.end():]
-    else:
+    target_id = _extract_target_from_text(content, guild, bot_id)
+    if not target_id:
         return None
 
-    reason = content.strip()
-    if not reason:
-        reason = "Aucune raison"
+    reason = _extract_reason(content, action_word or action)
 
-    return {"action": action, "target_id": target, "reason": reason}
+    return {"action": action, "target_id": str(target_id), "reason": reason}
 
 
 async def execute_natural_command(message, parsed):
@@ -4848,6 +4928,8 @@ async def execute_natural_command(message, parsed):
             await log_mod(guild, "Unban", message.author, user, reason)
         except discord.NotFound:
             await message.channel.send("Utilisateur non banni.", delete_after=5)
+
+
 # ──────────────────────────────────────────────
 
 # --- WELCOME PANEL ---
