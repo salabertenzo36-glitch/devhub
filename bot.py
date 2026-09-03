@@ -4956,55 +4956,56 @@ async def eco_withdraw(interaction: discord.Interaction, amount: str = "tout"):
     await interaction.response.send_message(f"`{wd:,}` pieces retirees de la banque.")
 
 
-@economy.command(name="shop", description="Voir le magasin")
-async def eco_shop(interaction: discord.Interaction):
+@economy.command(name="shop", description="Voir le magasin ou acheter/vendre")
+@app_commands.describe(action="Voir, acheter ou vendre", item="Nom de l'item", amount="Quantite")
+@app_commands.choices(action=[app_commands.Choice(name="voir", value="view"), app_commands.Choice(name="acheter", value="buy"), app_commands.Choice(name="vendre", value="sell")])
+async def eco_shop(interaction: discord.Interaction, action: str = "view", item: str = None, amount: int = 1):
     gid = str(interaction.guild.id)
     cfg = get_econ_config(gid)
     cur = cfg["currency"]
     shop = cfg.get("shop", DEFAULT_SHOP)
 
-    lines = []
-    for item_id, item in shop.items():
-        lines.append(f"{item.get('emoji', '❓')} **{item_id}** — `{item['price']:,}` {cur} — {item['desc']}")
-
-    view = view_text("## Magasin", *lines)
-    await interaction.response.send_message(view=view)
-
-
-@economy.command(name="buy", description="Acheter un objet du magasin")
-@app_commands.describe(item="Nom de l'item", amount="Quantite")
-async def eco_buy(interaction: discord.Interaction, item: str, amount: int = 1):
-    gid = str(interaction.guild.id)
-    cfg = get_econ_config(gid)
-    cur = cfg["currency"]
-    shop = cfg.get("shop", DEFAULT_SHOP)
-
-    if item not in shop:
-        await interaction.response.send_message("Item introuvable. Utilise `/economy shop`.", ephemeral=True)
-        return
-    if amount <= 0:
-        await interaction.response.send_message("Quantite invalide.", ephemeral=True)
+    if action == "view" or item is None:
+        lines = []
+        for item_id, info in shop.items():
+            lines.append(f"{info.get('emoji', '❓')} **{item_id}** — `{info['price']:,}` {cur} — {info['desc']}")
+        view = view_text("## Magasin", *lines)
+        await interaction.response.send_message(view=view)
         return
 
     uid = str(interaction.user.id)
     eco, data = get_economy(gid, uid)
-    shop_item = shop[item]
-    total_cost = shop_item["price"] * amount
 
-    if data["wallet"] < total_cost:
-        await interaction.response.send_message(f"Pas assez de {cur}. Cout : `{total_cost:,}`.", ephemeral=True)
-        return
+    if action == "buy":
+        if item not in shop:
+            await interaction.response.send_message("Item introuvable.", ephemeral=True)
+            return
+        shop_item = shop[item]
+        total_cost = shop_item["price"] * amount
+        if data["wallet"] < total_cost:
+            await interaction.response.send_message(f"Pas assez de {cur}. Cout : `{total_cost:,}`.", ephemeral=True)
+            return
+        data["wallet"] -= total_cost
+        inv = data.get("inventory", [])
+        for _ in range(amount):
+            inv.append(item)
+        data["inventory"] = inv
+        save_economy_data(eco)
+        await interaction.response.send_message(f"## Achat\n**{amount}x {item}** — `{total_cost:,}` {cur}")
 
-    data["wallet"] -= total_cost
-    inv = data.get("inventory", [])
-    for _ in range(amount):
-        inv.append(item)
-    data["inventory"] = inv
-    save_economy_data(eco)
-
-    await interaction.response.send_message(
-        f"## {shop_item.get('emoji', '❓')} Achat\n**{amount}x {item}** — `{total_cost:,}` {cur}"
-    )
+    elif action == "sell":
+        inv = data.get("inventory", [])
+        if inv.count(item) < amount:
+            await interaction.response.send_message("Tu n'as pas assez de cet item.", ephemeral=True)
+            return
+        shop_item = shop.get(item, {})
+        sell_price = int(shop_item.get("price", 100) * cfg["sell_percent"])
+        for _ in range(amount):
+            inv.remove(item)
+        data["inventory"] = inv
+        data["wallet"] += sell_price * amount
+        save_economy_data(eco)
+        await interaction.response.send_message(f"## Vente\n**{amount}x {item}** — `{sell_price * amount:,}` {cur}")
 
 
 @economy.command(name="inventory", description="Voir ton inventaire")
@@ -5017,53 +5018,18 @@ async def eco_inventory(interaction: discord.Interaction, member: discord.Member
     uid = str(target.id)
     eco, data = get_economy(gid, uid)
     inv = data.get("inventory", [])
-
     if not inv:
         await interaction.response.send_message("Ton inventaire est vide.", ephemeral=True)
         return
-
     counts = {}
-    for item in inv:
-        counts[item] = counts.get(item, 0) + 1
-
+    for i in inv:
+        counts[i] = counts.get(i, 0) + 1
     lines = []
     for item_id, count in counts.items():
         info = shop.get(item_id, {})
-        emoji = info.get("emoji", "❓")
-        desc = info.get("desc", item_id)
-        lines.append(f"{emoji} **{item_id}** x{count} — {desc}")
-
+        lines.append(f"{info.get('emoji', '❓')} **{item_id}** x{count} — {info.get('desc', item_id)}")
     view = view_text(f"## Inventaire de {target.display_name}", *lines)
     await interaction.response.send_message(view=view)
-
-
-@economy.command(name="sell", description="Vendre un objet")
-@app_commands.describe(item="Nom de l'item", amount="Quantite")
-async def eco_sell(interaction: discord.Interaction, item: str, amount: int = 1):
-    gid = str(interaction.guild.id)
-    cfg = get_econ_config(gid)
-    cur = cfg["currency"]
-    shop = cfg.get("shop", DEFAULT_SHOP)
-    uid = str(interaction.user.id)
-    eco, data = get_economy(gid, uid)
-    inv = data.get("inventory", [])
-
-    if inv.count(item) < amount:
-        await interaction.response.send_message("Tu n'as pas assez de cet item.", ephemeral=True)
-        return
-
-    shop_item = shop.get(item, {})
-    sell_price = int(shop_item.get("price", 100) * cfg["sell_percent"])
-
-    for _ in range(amount):
-        inv.remove(item)
-    data["inventory"] = inv
-    data["wallet"] += sell_price * amount
-    save_economy_data(eco)
-
-    await interaction.response.send_message(
-        f"## {ce} Vente\n**{amount}x {item}** — `{sell_price * amount:,}` {cur} ({int(cfg['sell_percent']*100)}%)"
-    )
 
 
 @economy.command(name="rob", description="Vole les pieces d'un membre")
@@ -5150,53 +5116,6 @@ async def eco_leaderboard(interaction: discord.Interaction):
 
     view = view_text("## Classement economique", *lines)
     await interaction.response.send_message(view=view)
-
-
-@economy.command(name="slots_jackpot", description="Jackpot speciale")
-async def eco_slots_jackpot(interaction: discord.Interaction):
-    gid = str(interaction.guild.id)
-    uid = str(interaction.user.id)
-    eco, data = get_economy(gid, uid)
-    cfg = get_econ_config(gid)
-    cur = cfg["currency"]
-    ce = cfg["currency_emoji"]
-    price = cfg["slots_jackpot_price"]
-
-    if data["wallet"] < price:
-        await interaction.response.send_message(f"Tu dois avoir `{price:,}` {cur}.", ephemeral=True)
-        return
-
-    data["wallet"] -= price
-    roll = _random.random()
-
-    if roll < 0.01:
-        win = cfg["slots_jackpot_win1"]
-        data["wallet"] += win
-        data["xp"] = data.get("xp", 0) + 200
-        save_economy_data(eco)
-        await interaction.response.send_message(f"## {ce} MEGA JACKPOT !!\nTu gagnes **{win:,}** {cur} !")
-    elif roll < 0.05:
-        win = cfg["slots_jackpot_win2"]
-        data["wallet"] += win
-        data["xp"] = data.get("xp", 0) + 100
-        save_economy_data(eco)
-        await interaction.response.send_message(f"## {ce} Jackpot !\nTu gagnes **{win:,}** {cur} !")
-    elif roll < 0.15:
-        win = cfg["slots_jackpot_win3"]
-        data["wallet"] += win
-        data["xp"] = data.get("xp", 0) + 50
-        save_economy_data(eco)
-        await interaction.response.send_message(f"## {ce} Gagne !\nTu gagnes **{win:,}** {cur} !")
-    elif roll < 0.30:
-        win = int(price * 1.2)
-        data["wallet"] += win
-        data["xp"] = data.get("xp", 0) + 20
-        save_economy_data(eco)
-        await interaction.response.send_message(f"## {ce} Rembourse !\nTu gagnes **{win:,}** {cur} !")
-    else:
-        data["xp"] = max(0, data.get("xp", 0) - 10)
-        save_economy_data(eco)
-        await interaction.response.send_message(f"## PERDU.\nTu perds `{price:,}` {cur}.")
 
 
 @economy.command(name="config", description="Configurer l'economie du serveur")
