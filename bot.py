@@ -381,6 +381,36 @@ async def generate_boost_image(member):
     return discord.File(buf, filename="boost.png")
 
 
+def build_welcome_view(msg, image_filename, accent_color=11581636):
+    view = discord.ui.LayoutView(timeout=None)
+    container = discord.ui.Container(accent_colour=accent_color)
+    container.add_item(discord.ui.TextDisplay(msg))
+    if image_filename:
+        container.add_item(discord.ui.Image(url=f"attachment://{image_filename}"))
+    view.add_item(container)
+    return view
+
+
+def build_goodbye_view(msg, image_filename):
+    view = discord.ui.LayoutView(timeout=None)
+    container = discord.ui.Container(accent_colour=9807270)
+    container.add_item(discord.ui.TextDisplay(msg))
+    if image_filename:
+        container.add_item(discord.ui.Image(url=f"attachment://{image_filename}"))
+    view.add_item(container)
+    return view
+
+
+def build_boost_view(msg, image_filename):
+    view = discord.ui.LayoutView(timeout=None)
+    container = discord.ui.Container(accent_colour=16711702)
+    container.add_item(discord.ui.TextDisplay(msg))
+    if image_filename:
+        container.add_item(discord.ui.Image(url=f"attachment://{image_filename}"))
+    view.add_item(container)
+    return view
+
+
 @bot.event
 async def on_ready():
     db_connect()
@@ -3301,7 +3331,8 @@ async def welcome_setup(interaction: discord.Interaction, action: str, channel: 
         msg = s.get("welcome_message", "Bienvenue {user} sur **{server}** !")
         msg = msg.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
         file = await generate_welcome_image(interaction.user)
-        await interaction.response.send_message(f"**Aperçu :**\n{msg}", file=file, ephemeral=True)
+        view = build_welcome_view(msg, "welcome.png")
+        await interaction.response.send_message(view=view, file=file, ephemeral=True)
 
     else:
         if not channel:
@@ -3313,10 +3344,11 @@ async def welcome_setup(interaction: discord.Interaction, action: str, channel: 
         save_settings(settings)
         file = await generate_welcome_image(interaction.user)
         preview_msg = message.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
+        view = build_welcome_view(preview_msg, "welcome.png")
         await interaction.response.send_message(
             f"Accueil configuré dans {channel.mention}.\n"
-            f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`\n\n"
-            f"**Aperçu :**\n{preview_msg}",
+            f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`",
+            view=view,
             file=file
         )
 
@@ -3355,7 +3387,8 @@ async def goodbye(interaction: discord.Interaction, action: str, channel: discor
         msg = s.get("goodbye_message", "**{user}** a quitté **{server}**.")
         msg = msg.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
         file = await generate_goodbye_image(interaction.user)
-        await interaction.response.send_message(f"**Aperçu :**\n{msg}", file=file, ephemeral=True)
+        view = build_goodbye_view(msg, "goodbye.png")
+        await interaction.response.send_message(view=view, file=file, ephemeral=True)
 
     else:
         if not channel:
@@ -3367,10 +3400,11 @@ async def goodbye(interaction: discord.Interaction, action: str, channel: discor
         save_settings(settings)
         file = await generate_goodbye_image(interaction.user)
         preview_msg = message.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
+        view = build_goodbye_view(preview_msg, "goodbye.png")
         await interaction.response.send_message(
             f"Départ configuré dans {channel.mention}.\n"
-            f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`\n\n"
-            f"**Aperçu :**\n{preview_msg}",
+            f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`",
+            view=view,
             file=file
         )
 
@@ -3410,7 +3444,8 @@ async def boost(interaction: discord.Interaction, action: str, channel: discord.
         boost_count = interaction.guild.premium_subscription_count or 0
         msg = msg.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{boosts}", str(boost_count))
         file = await generate_boost_image(interaction.user)
-        await interaction.response.send_message(f"**Aperçu :**\n{msg}", file=file, ephemeral=True)
+        view = build_boost_view(msg, "boost.png")
+        await interaction.response.send_message(view=view, file=file, ephemeral=True)
 
     else:
         if not channel:
@@ -3423,10 +3458,11 @@ async def boost(interaction: discord.Interaction, action: str, channel: discord.
         file = await generate_boost_image(interaction.user)
         boost_count = interaction.guild.premium_subscription_count or 0
         preview_msg = message.replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{boosts}", str(boost_count))
+        view = build_boost_view(preview_msg, "boost.png")
         await interaction.response.send_message(
             f"Boost configuré dans {channel.mention}.\n"
-            f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`\n\n"
-            f"**Aperçu :**\n{preview_msg}",
+            f"Image Canvas : `{'Activée' if image == 'on' else 'Désactivée'}`",
+            view=view,
             file=file
         )
 
@@ -4193,9 +4229,11 @@ async def on_member_remove(member: discord.Member):
             try:
                 if s.get("goodbye_image", True):
                     goodbye_file = await generate_goodbye_image(member)
-                    await channel.send(msg, file=goodbye_file)
+                    view = build_goodbye_view(msg, "goodbye.png")
+                    await channel.send(view=view, file=goodbye_file)
                 else:
-                    await channel.send(msg)
+                    view = build_goodbye_view(msg, None)
+                    await channel.send(view=view)
             except discord.Forbidden:
                 pass
 
@@ -4267,9 +4305,11 @@ async def on_member_join(member: discord.Member):
                 try:
                     if s.get("welcome_image", True):
                         welcome_file = await generate_welcome_image(member)
-                        await channel.send(msg, file=welcome_file)
+                        view = build_welcome_view(msg, "welcome.png")
+                        await channel.send(view=view, file=welcome_file)
                     else:
-                        await channel.send(msg)
+                        view = build_welcome_view(msg, None)
+                        await channel.send(view=view)
                 except discord.Forbidden:
                     pass
 
@@ -4351,9 +4391,11 @@ async def on_member_update(before: discord.Member, after: discord.Member):
                 try:
                     if s.get("boost_image", True):
                         boost_file = await generate_boost_image(after)
-                        await channel.send(msg, file=boost_file)
+                        view = build_boost_view(msg, "boost.png")
+                        await channel.send(view=view, file=boost_file)
                     else:
-                        await channel.send(msg)
+                        view = build_boost_view(msg, None)
+                        await channel.send(view=view)
                 except discord.Forbidden:
                     pass
 
