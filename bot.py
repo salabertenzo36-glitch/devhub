@@ -6585,16 +6585,23 @@ async def on_message(message: discord.Message):
             content = re.sub(r'`[^`]*`', '', content)
             content = re.sub(r'```[\s\S]*?```', '', content)
         if LINK_PATTERN.search(content):
+            if message.author.id == OWNER_ID:
+                return
             perms = message.channel.permissions_for(message.author)
-            if not perms.administrator:
-                try:
-                    await message.delete()
-                    await message.channel.send(
-                        f"**{message.author.display_name}**, les liens ne sont pas autorises.",
-                        delete_after=5
-                    )
-                except discord.Forbidden:
-                    pass
+            if not perms.administrator and not perms.manage_guild:
+                settings2 = load_settings()
+                gid2 = str(message.guild.id)
+                staff_roles = settings2.get(gid2, {}).get("staff_roles", [])
+                is_staff = any(r.id in staff_roles for r in message.author.roles)
+                if not is_staff:
+                    try:
+                        await message.delete()
+                        await message.channel.send(
+                            f"**{message.author.display_name}**, les liens ne sont pas autorises.",
+                            delete_after=5
+                        )
+                    except discord.Forbidden:
+                        pass
 
     if message.guild:
         gid = str(message.guild.id)
