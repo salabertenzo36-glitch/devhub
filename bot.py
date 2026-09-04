@@ -5665,37 +5665,22 @@ async def botillion_request(endpoint, method="GET", data=None):
 botillion = app_commands.Group(name="botillion", description="Botillion integration")
 
 
-@botillion.command(name="vote", description="Verifie si un membre a vote (donne une recompense)")
+@botillion.command(name="vote", description="Verifie ton vote Botillion et gagne une recompense")
 @app_commands.describe(member="Le membre a verifier")
 async def botillion_vote(interaction: discord.Interaction, member: discord.Member = None):
     target = member or interaction.user
-    result = await botillion_request(f"/me/check/{target.id}")
-    if not result or result.get("error"):
-        await interaction.response.send_message("**API Botillion** : Cloudflare bloque les requetes depuis les serveurs. Le proprietaire de botillon.fr doit whitelist les IP du bot. En attendant, vote sur https://botillon.fr et contacte le support.", ephemeral=True)
-        return
+    verify_url = f"https://devhub-official.vercel.app/botillion/?user={target.id}&guild={interaction.guild.id}&reward=5000"
 
-    voted = result.get("voted_last_12h", False)
-    registered = result.get("registered_on_site", False)
-    liked = result.get("has_liked", False)
+    view = view_text(
+        "## Botillion — Vote",
+        f"**Vote** pour Dev Hub sur [botillon.fr](https://botillon.fr/bot/1544077666473353256)",
+        "Puis clique sur le bouton ci-dessous pour verifier ton vote.",
+    )
 
-    lines = [f"## Statut de {target.display_name}"]
-    if not registered:
-        lines.append(f"**Inscrit sur Botillion** : Non")
-        lines.append(f"Connecte-toi sur [botillon.fr](https://botillon.fr) puis vote pour Dev Hub !")
-    else:
-        lines.append(f"**Inscrit** : Oui")
-        lines.append(f"**Vote 12h** : {'Oui' if voted else 'Non'}")
-        lines.append(f"**Like** : {'Oui' if liked else 'Non'}")
-
-    if voted:
-        eco, data = get_economy(str(interaction.guild.id), str(target.id))
-        reward = 5000
-        data["wallet"] += reward
-        save_economy_data(eco)
-        lines.append(f"\n**Recompense** : +5,000 pieces pour le vote !")
-
-    view = view_text("## Botillion — Vote", *lines)
-    await interaction.response.send_message(view=view)
+    import discord as _d
+    link_view = _d.ui.View()
+    link_view.add_item(_d.ui.Button(label="Verifier mon vote", style=_d.ButtonStyle.link, url=verify_url))
+    await interaction.response.send_message(view=view, view=link_view, ephemeral=True)
 
 
 @botillion.command(name="rank", description="Voir le classement de Dev Hub sur Botillion")
@@ -6840,6 +6825,27 @@ async def on_message(message: discord.Message):
                                 pass
 
     await bot.process_commands(message)
+
+    if message.webhook_id and str(message.webhook_id) == "1545562747742453773":
+        try:
+            if message.embeds:
+                embed = message.embeds[0]
+                desc = embed.description or ""
+                import re as _re_wb
+                match = _re_wb.search(r'<@(\d+)>', desc)
+                if match:
+                    uid = match.group(1)
+                    gid = str(message.guild.id)
+                    eco, data = get_economy(gid, uid)
+                    reward = 5000
+                    data["wallet"] += reward
+                    save_economy_data(eco)
+                    member = message.guild.get_member(int(uid))
+                    name = member.display_name if member else uid
+                    await message.channel.send(f"**{name}** a recu **{reward:,}** pieces pour son vote Botillion !", delete_after=15)
+        except Exception:
+            pass
+        return
 
     try:
         await on_message_level(message)
