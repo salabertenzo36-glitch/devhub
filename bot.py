@@ -5642,35 +5642,24 @@ BOTILLION_BASE = "https://botillon.fr/api/v1"
 async def botillion_request(endpoint, method="GET", data=None):
     import subprocess
     import json as _json
-
-    def _fetch():
-        url = f"{BOTILLION_BASE}{endpoint}"
-        auth = "Authorization: Bearer " + BOTILLION_API_KEY
-        ua = "User-Agent: DevHub/1.0 (https://devhub-official.vercel.app)"
-        ct = "Content-Type: application/json"
-        try:
-            if method == "GET":
-                r = subprocess.run(
-                    ["curl", "-s", "-m", "10", "-H", auth, "-H", ua, "-H", ct, url],
-                    capture_output=True, text=True, timeout=15
-                )
-            elif method == "PATCH" and data:
-                r = subprocess.run(
-                    ["curl", "-s", "-m", "10", "-X", "PATCH", "-H", auth, "-H", ua, "-H", ct,
-                     "-d", _json.dumps(data), url],
-                    capture_output=True, text=True, timeout=15
-                )
-            else:
-                return None
-            print(f"[Botillion] {method} {endpoint} -> {r.returncode} | {r.stdout[:200]}")
+    proxy_url = f"https://devhub-official.vercel.app/api/botillion?endpoint={endpoint}"
+    try:
+        def _fetch():
+            cmd = ["curl", "-s", "-m", "10", proxy_url]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             if r.returncode == 0 and r.stdout.strip():
-                return _json.loads(r.stdout)
-            return None
-        except Exception as e:
-            print(f"[Botillion] Error: {e}")
-            return None
-
-    return await asyncio.get_event_loop().run_in_executor(None, _fetch)
+                try:
+                    data = _json.loads(r.stdout)
+                    if "error" in data:
+                        return {"error": "cloudflare_blocked"}
+                    return data
+                except _json.JSONDecodeError:
+                    return {"error": "cloudflare_blocked"}
+            return {"error": "network_error"}
+        return await asyncio.get_event_loop().run_in_executor(None, _fetch)
+    except Exception as e:
+        print(f"[Botillion] Error: {e}")
+        return {"error": "exception"}
 
 
 botillion = app_commands.Group(name="botillion", description="Botillion integration")
@@ -5681,8 +5670,8 @@ botillion = app_commands.Group(name="botillion", description="Botillion integrat
 async def botillion_vote(interaction: discord.Interaction, member: discord.Member = None):
     target = member or interaction.user
     result = await botillion_request(f"/me/check/{target.id}")
-    if not result:
-        await interaction.response.send_message("Impossible de contacter l'API Botillion.", ephemeral=True)
+    if not result or result.get("error"):
+        await interaction.response.send_message("**API Botillion** : Cloudflare bloque les requetes depuis les serveurs. Le proprietaire de botillon.fr doit whitelist les IP du bot. En attendant, vote sur https://botillon.fr et contacte le support.", ephemeral=True)
         return
 
     voted = result.get("voted_last_12h", False)
@@ -5712,8 +5701,8 @@ async def botillion_vote(interaction: discord.Interaction, member: discord.Membe
 @botillion.command(name="rank", description="Voir le classement de Dev Hub sur Botillion")
 async def botillion_rank(interaction: discord.Interaction):
     result = await botillion_request("/me/rank")
-    if not result:
-        await interaction.response.send_message("Impossible de contacter l'API Botillion.", ephemeral=True)
+    if not result or result.get("error"):
+        await interaction.response.send_message("**API Botillion** : Cloudflare bloque les requetes. Le proprietaire de botillon.fr doit whitelist les IP du bot.", ephemeral=True)
         return
 
     ranks = result.get("ranks", {})
@@ -5735,8 +5724,8 @@ async def botillion_rank(interaction: discord.Interaction):
 @botillion.command(name="stats", description="Stats detaillees de Dev Hub sur Botillion")
 async def botillion_stats(interaction: discord.Interaction):
     result = await botillion_request("/me/stats?days=7")
-    if not result:
-        await interaction.response.send_message("Impossible de contacter l'API Botillion.", ephemeral=True)
+    if not result or result.get("error"):
+        await interaction.response.send_message("**API Botillion** : Cloudflare bloque les requetes. Le proprietaire de botillon.fr doit whitelist les IP du bot.", ephemeral=True)
         return
 
     totals = result.get("totals", {})
@@ -5754,8 +5743,8 @@ async def botillion_stats(interaction: discord.Interaction):
 @botillion.command(name="profile", description="Voir le profil de Dev Hub sur Botillion")
 async def botillion_profile(interaction: discord.Interaction):
     result = await botillion_request("/me")
-    if not result:
-        await interaction.response.send_message("Impossible de contacter l'API Botillion.", ephemeral=True)
+    if not result or result.get("error"):
+        await interaction.response.send_message("**API Botillion** : Cloudflare bloque les requetes. Le proprietaire de botillon.fr doit whitelist les IP du bot.", ephemeral=True)
         return
 
     bot_info = result.get("bot", {})
