@@ -5633,6 +5633,132 @@ async def check_giveaways():
 
 
 # ──────────────────────────────────────────────
+#  BOTILLION API
+# ──────────────────────────────────────────────
+
+BOTILLION_API_KEY = os.environ.get("BOTILLION_API_KEY", "blp_310489eb369f75cd5455c9046be81eb01d845a6ed8809ad6")
+BOTILLION_BASE = "https://botillon.fr/api/v1"
+
+async def botillion_request(endpoint, method="GET", data=None):
+    url = f"{BOTILLION_BASE}{endpoint}"
+    headers = {"Authorization": f"Bearer {BOTILLION_API_KEY}", "Content-Type": "application/json"}
+    try:
+        async with aiohttp.ClientSession() as session:
+            if method == "GET":
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    return None
+            elif method == "PATCH":
+                async with session.patch(url, headers=headers, json=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 200:
+                        return await resp.json()
+                    return None
+    except Exception:
+        return None
+
+
+botillion = app_commands.Group(name="botillion", description="Botillion integration")
+
+
+@botillion.command(name="vote", description="Verifie si un membre a vote (donne une recompense)")
+@app_commands.describe(member="Le membre a verifier")
+async def botillion_vote(interaction: discord.Interaction, member: discord.Member = None):
+    target = member or interaction.user
+    result = await botillion_request(f"/me/check/{target.id}")
+    if not result:
+        await interaction.response.send_message("Impossible de contacter l'API Botillion.", ephemeral=True)
+        return
+
+    voted = result.get("voted_last_12h", False)
+    registered = result.get("registered_on_site", False)
+    liked = result.get("has_liked", False)
+
+    lines = [f"## Statut de {target.display_name}"]
+    if not registered:
+        lines.append(f"**Inscrit sur Botillion** : Non")
+        lines.append(f"Connecte-toi sur [botillon.fr](https://botillon.fr) puis vote pour Dev Hub !")
+    else:
+        lines.append(f"**Inscrit** : Oui")
+        lines.append(f"**Vote 12h** : {'Oui' if voted else 'Non'}")
+        lines.append(f"**Like** : {'Oui' if liked else 'Non'}")
+
+    if voted:
+        eco, data = get_economy(str(interaction.guild.id), str(target.id))
+        reward = 5000
+        data["wallet"] += reward
+        save_economy_data(eco)
+        lines.append(f"\n**Recompense** : +5,000 pieces pour le vote !")
+
+    view = view_text("## Botillion — Vote", *lines)
+    await interaction.response.send_message(view=view)
+
+
+@botillion.command(name="rank", description="Voir le classement de Dev Hub sur Botillion")
+async def botillion_rank(interaction: discord.Interaction):
+    result = await botillion_request("/me/rank")
+    if not result:
+        await interaction.response.send_message("Impossible de contacter l'API Botillion.", ephemeral=True)
+        return
+
+    ranks = result.get("ranks", {})
+    percentiles = result.get("percentiles", {})
+    total = result.get("total_approved", 0)
+
+    view = view_text(
+        f"## Dev Hub — Rang Botillion",
+        f"**Classement parmi {total} bots**",
+        "",
+        f"**Votes** : #{ranks.get('votes', '?')} (top {percentiles.get('votes', '?')}%)",
+        f"**Likes** : #{ranks.get('likes', '?')} (top {percentiles.get('likes', '?')}%)",
+        f"**Serveurs** : #{ranks.get('servers', '?')} (top {percentiles.get('servers', '?')}%)",
+        f"**Avis** : #{ranks.get('comments', '?')} (top {percentiles.get('comments', '?')}%)",
+    )
+    await interaction.response.send_message(view=view)
+
+
+@botillion.command(name="stats", description="Stats detaillees de Dev Hub sur Botillion")
+async def botillion_stats(interaction: discord.Interaction):
+    result = await botillion_request("/me/stats?days=7")
+    if not result:
+        await interaction.response.send_message("Impossible de contacter l'API Botillion.", ephemeral=True)
+        return
+
+    totals = result.get("totals", {})
+    view = view_text(
+        "## Dev Hub — Stats Botillion",
+        f"**Votes** : `{totals.get('votes_24h', 0)}` (24h) · `{totals.get('votes_7d', 0)}` (7j) · `{totals.get('votes_30d', 0)}` (30j)",
+        f"**Votes actifs** : `{totals.get('active_votes', 0)}`",
+        f"**Likes** : `{totals.get('likes_24h', 0)}` (24h) · `{totals.get('likes_7d', 0)}` (7j) · `{totals.get('likes_30d', 0)}` (30j)",
+        f"**Avis** : `{totals.get('comments_24h', 0)}` (24h) · `{totals.get('comments_7d', 0)}` (7j) · `{totals.get('comments_30d', 0)}` (30j)",
+        f"**Visites** : `{totals.get('visits_24h', 0)}` (24h) · `{totals.get('visits_7d', 0)}` (7j) · `{totals.get('visits_30d', 0)}` (30j)",
+    )
+    await interaction.response.send_message(view=view)
+
+
+@botillion.command(name="profile", description="Voir le profil de Dev Hub sur Botillion")
+async def botillion_profile(interaction: discord.Interaction):
+    result = await botillion_request("/me")
+    if not result:
+        await interaction.response.send_message("Impossible de contacter l'API Botillion.", ephemeral=True)
+        return
+
+    bot_info = result.get("bot", {})
+    counts = result.get("counts", {})
+
+    view = view_text(
+        "## Dev Hub — Profil Botillion",
+        f"**Nom** : {bot_info.get('name', 'Dev Hub')}",
+        f"**Tagline** : {bot_info.get('tagline', '')}",
+        f"**Status** : {bot_info.get('status', 'unknown')}",
+        f"**Votes** : `{counts.get('votes_total', 0)}` total · `{counts.get('votes_active_12h', 0)}` actifs (12h)",
+        f"**Likes** : `{counts.get('likes', 0)}`",
+        f"**Avis** : `{counts.get('comments', 0)}`",
+    )
+    await interaction.response.send_message(view=view)
+
+
+# ──────────────────────────────────────────────
 #  LOGGING SYSTEM
 # ──────────────────────────────────────────────
 
@@ -7932,7 +8058,7 @@ async def ai_panel(interaction: discord.Interaction):
 # Les handlers ci-dessous ont été fusionnés dans celui du ticket/help.
 
 # ─── ENREGISTREMENT DES GROUPES ───
-for g in [mod, config, welcome, ticket, music, util, fun, backup, stats, raid, ghostping, ai, giveaway, poll_cmd, level_cmd, log]:
+for g in [mod, config, welcome, ticket, music, util, fun, backup, stats, raid, ghostping, ai, giveaway, poll_cmd, level_cmd, log, botillion]:
     bot.tree.add_command(g)
 
 bot.run(TOKEN)
