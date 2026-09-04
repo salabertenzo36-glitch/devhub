@@ -5629,7 +5629,7 @@ async def check_giveaways():
                             await channel.send(embed=embed)
                 except Exception:
                     pass
-        await _asyncio.sleep(5)
+        await asyncio.sleep(5)
 
 
 # ──────────────────────────────────────────────
