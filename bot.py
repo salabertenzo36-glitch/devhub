@@ -5646,16 +5646,17 @@ async def botillion_request(endpoint, method="GET", data=None):
     def _fetch():
         url = f"{BOTILLION_BASE}{endpoint}"
         auth = "Authorization: Bearer " + BOTILLION_API_KEY
+        ua = "User-Agent: DevHub/1.0 (https://devhub-official.vercel.app)"
         ct = "Content-Type: application/json"
         try:
             if method == "GET":
                 r = subprocess.run(
-                    ["curl", "-s", "-m", "10", "-H", auth, "-H", ct, url],
+                    ["curl", "-s", "-m", "10", "-H", auth, "-H", ua, "-H", ct, url],
                     capture_output=True, text=True, timeout=15
                 )
             elif method == "PATCH" and data:
                 r = subprocess.run(
-                    ["curl", "-s", "-m", "10", "-X", "PATCH", "-H", auth, "-H", ct,
+                    ["curl", "-s", "-m", "10", "-X", "PATCH", "-H", auth, "-H", ua, "-H", ct,
                      "-d", _json.dumps(data), url],
                     capture_output=True, text=True, timeout=15
                 )
