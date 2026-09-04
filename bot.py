@@ -6339,7 +6339,7 @@ async def on_message_level(message):
 level_cmd = app_commands.Group(name="level", description="Systeme de niveaux")
 
 
-@level_cmd.command(name="", description="Voir ton niveau")
+@level_cmd.command(name="view", description="Voir ton niveau")
 @app_commands.describe(member="Membre a inspecter")
 async def level_view(interaction: discord.Interaction, member: discord.Member = None):
     target = member or interaction.user
