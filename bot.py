@@ -5671,16 +5671,14 @@ async def botillion_vote(interaction: discord.Interaction, member: discord.Membe
     target = member or interaction.user
     verify_url = f"https://devhub-official.vercel.app/botillion/?user={target.id}&guild={interaction.guild.id}&reward=5000"
 
-    view = view_text(
-        "## Botillion — Vote",
-        f"**Vote** pour Dev Hub sur [botillon.fr](https://botillon.fr/bot/1544077666473353256)",
-        "Puis clique sur le bouton ci-dessous pour verifier ton vote.",
-    )
-
-    import discord as _d
     link_view = _d.ui.View()
     link_view.add_item(_d.ui.Button(label="Verifier mon vote", style=_d.ButtonStyle.link, url=verify_url))
-    await interaction.response.send_message(view=view, view=link_view, ephemeral=True)
+    await interaction.response.send_message(
+        f"## Botillion — Vote\n"
+        f"**Vote** pour Dev Hub sur [botillon.fr](https://botillon.fr/bot/1544077666473353256)\n"
+        f"Puis clique sur le bouton ci-dessous pour verifier ton vote.",
+        view=link_view, ephemeral=True
+    )
 
 
 @botillion.command(name="rank", description="Voir le classement de Dev Hub sur Botillion")
