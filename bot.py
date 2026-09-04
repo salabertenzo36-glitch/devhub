@@ -5642,28 +5642,34 @@ BOTILLION_BASE = "https://botillon.fr/api/v1"
 async def botillion_request(endpoint, method="GET", data=None):
     import subprocess
     import json as _json
-    url = f"{BOTILLION_BASE}{endpoint}"
-    headers = ["Authorization: Bearer " + BOTILLION_API_KEY, "Content-Type: application/json"]
-    try:
-        if method == "GET":
-            result = subprocess.run(
-                ["curl", "-s", "-m", "10", "-H", headers[0], "-H", headers[1], url],
-                capture_output=True, text=True, timeout=15
-            )
-        elif method == "PATCH" and data:
-            result = subprocess.run(
-                ["curl", "-s", "-m", "10", "-X", "PATCH", "-H", headers[0], "-H", headers[1],
-                 "-d", _json.dumps(data), url],
-                capture_output=True, text=True, timeout=15
-            )
-        else:
+
+    def _fetch():
+        url = f"{BOTILLION_BASE}{endpoint}"
+        auth = "Authorization: Bearer " + BOTILLION_API_KEY
+        ct = "Content-Type: application/json"
+        try:
+            if method == "GET":
+                r = subprocess.run(
+                    ["curl", "-s", "-m", "10", "-H", auth, "-H", ct, url],
+                    capture_output=True, text=True, timeout=15
+                )
+            elif method == "PATCH" and data:
+                r = subprocess.run(
+                    ["curl", "-s", "-m", "10", "-X", "PATCH", "-H", auth, "-H", ct,
+                     "-d", _json.dumps(data), url],
+                    capture_output=True, text=True, timeout=15
+                )
+            else:
+                return None
+            print(f"[Botillion] {method} {endpoint} -> {r.returncode} | {r.stdout[:200]}")
+            if r.returncode == 0 and r.stdout.strip():
+                return _json.loads(r.stdout)
             return None
-        if result.returncode == 0 and result.stdout:
-            return _json.loads(result.stdout)
-        return None
-    except Exception as e:
-        print(f"Botillion API error: {e}")
-        return None
+        except Exception as e:
+            print(f"[Botillion] Error: {e}")
+            return None
+
+    return await asyncio.get_event_loop().run_in_executor(None, _fetch)
 
 
 botillion = app_commands.Group(name="botillion", description="Botillion integration")
