@@ -5640,18 +5640,21 @@ BOTILLION_API_KEY = os.environ.get("BOTILLION_API_KEY", "blp_310489eb369f75cd545
 BOTILLION_BASE = "https://botillon.fr/api/v1"
 
 async def botillion_request(endpoint, method="GET", data=None):
-    import urllib.request
-    import urllib.error
-    import json as _json
+    import requests as _req
     url = f"{BOTILLION_BASE}{endpoint}"
     headers = {"Authorization": f"Bearer {BOTILLION_API_KEY}", "Content-Type": "application/json"}
     try:
-        req = urllib.request.Request(url, headers=headers, method=method)
-        if data:
-            req.data = _json.dumps(data).encode()
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return _json.loads(resp.read().decode())
-    except Exception:
+        if method == "GET":
+            resp = _req.get(url, headers=headers, timeout=10, verify=True)
+        elif method == "PATCH":
+            resp = _req.patch(url, headers=headers, json=data, timeout=10, verify=True)
+        else:
+            return None
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+    except Exception as e:
+        print(f"Botillion API error: {e}")
         return None
 
 
