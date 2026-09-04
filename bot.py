@@ -5640,20 +5640,17 @@ BOTILLION_API_KEY = os.environ.get("BOTILLION_API_KEY", "blp_310489eb369f75cd545
 BOTILLION_BASE = "https://botillon.fr/api/v1"
 
 async def botillion_request(endpoint, method="GET", data=None):
+    import urllib.request
+    import urllib.error
+    import json as _json
     url = f"{BOTILLION_BASE}{endpoint}"
     headers = {"Authorization": f"Bearer {BOTILLION_API_KEY}", "Content-Type": "application/json"}
     try:
-        async with aiohttp.ClientSession() as session:
-            if method == "GET":
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        return await resp.json()
-                    return None
-            elif method == "PATCH":
-                async with session.patch(url, headers=headers, json=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 200:
-                        return await resp.json()
-                    return None
+        req = urllib.request.Request(url, headers=headers, method=method)
+        if data:
+            req.data = _json.dumps(data).encode()
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return _json.loads(resp.read().decode())
     except Exception:
         return None
 
