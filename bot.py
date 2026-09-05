@@ -1924,7 +1924,7 @@ async def poll(interaction: discord.Interaction, question: str, option1: str, op
 HELP_CATEGORIES = {
     "mod": {
         "label": "Modération",
-        "emoji": "<:7964modbadgewhite:1544381242705846302>",
+        "emoji": "<:moderation:1545843972398907456>",
         "commands": [
             "`/mod warn` — Avertir un membre",
             "`/mod warnings` — Affiche les warns",
@@ -1946,7 +1946,7 @@ HELP_CATEGORIES = {
     },
     "config": {
         "label": "Configuration",
-        "emoji": "<:56644tools:1544381257264140328>",
+        "emoji": "<:settings:1545844069333344426>",
         "commands": [
             "`/config staff-roles` — Roles staff",
             "`/config ticket-channel` — Canal de tickets",
@@ -1959,7 +1959,7 @@ HELP_CATEGORIES = {
     },
     "welcome": {
         "label": "Welcome & Goodbye",
-        "emoji": "<:1882megaphone:1544381218932654143>",
+        "emoji": "<:welcome:1545844180004249740>",
         "commands": [
             "`/welcome setup` — Configurer l'accueil",
             "`/welcome disable` — Désactiver l'accueil",
@@ -1974,7 +1974,7 @@ HELP_CATEGORIES = {
     },
     "ticket": {
         "label": "Tickets",
-        "emoji": "<:9891chaticon:1544381248246513694>",
+        "emoji": "<:tickets:1545844127663521872>",
         "commands": [
             "`/ticket setup` — Setup complet",
             "`/ticket panel` — Envoyer le panel",
@@ -1990,7 +1990,7 @@ HELP_CATEGORIES = {
     },
     "music": {
         "label": "Musique",
-        "emoji": "<:9183shoppingcart:1544381246854008922>",
+        "emoji": "<:music:1545843979214528544>",
         "commands": [
             "`/music play` — Jouer une musique",
             "`/music pause` — Pause",
@@ -2005,7 +2005,7 @@ HELP_CATEGORIES = {
     },
     "util": {
         "label": "Utilitaires",
-        "emoji": "<:10447information:1544381249550942429>",
+        "emoji": "<:utilitaires:1545844167308083321>",
         "commands": [
             "`/util ping` — Latence",
             "`/util uptime` — Temps de fonctionnement",
@@ -2031,7 +2031,7 @@ HELP_CATEGORIES = {
     },
     "fun": {
         "label": "Fun",
-        "emoji": "<:75645star:1544381263517843556>",
+        "emoji": "<:fun:1545843877699919945>",
         "commands": [
             "`/fun coinflip` — Pile ou face",
             "`/fun dice` — Lancer de dé",
@@ -2042,7 +2042,7 @@ HELP_CATEGORIES = {
     },
     "backup": {
         "label": "Backup",
-        "emoji": "<:2577whitenitroboost:1544381220220182589>",
+        "emoji": "<:cloud_upload:1545843809689014322>",
         "commands": [
             "`/backup create` — Créer une backup",
             "`/backup list` — Liste les backups",
@@ -2052,7 +2052,7 @@ HELP_CATEGORIES = {
     },
     "stats": {
         "label": "Statistiques",
-        "emoji": "<:10845currency:1544381252105277521>",
+        "emoji": "<:stats:1545844101629481141>",
         "commands": [
             "`/stats user` — Stats d'un membre",
             "`/stats server` — Stats du serveur",
@@ -2060,7 +2060,7 @@ HELP_CATEGORIES = {
     },
     "raid": {
         "label": "Anti-raid",
-        "emoji": "<:84795adminicon:1544381268295417917>",
+        "emoji": "<:shield_alert:1545844072877654097>",
         "commands": [
             "`/raid config` — Configurer l'anti-raid (10 protections)",
             "`/raid log` — Salon de logs",
@@ -2075,14 +2075,14 @@ HELP_CATEGORIES = {
     },
     "ghostping": {
         "label": "Ghostping",
-        "emoji": "<:1569whitepin:1544381217657323560>",
+        "emoji": "<:ghostping:1545843885710774362>",
         "commands": [
             "`/ghostping send` — Ghostping un salon",
         ]
     },
     "ai": {
         "label": "IA Insolente",
-        "emoji": "<:56832developer:1544381258543534150>",
+        "emoji": "<:sparkle:1545844091739443220>",
         "commands": [
             "`/ai panel` — Panel de configuration",
         ]
