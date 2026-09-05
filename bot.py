@@ -489,7 +489,7 @@ async def on_guild_join(guild: discord.Guild):
                 color=0xb0b8c4,
             )
             dm_embed.set_thumbnail(url=bot.user.display_avatar.url)
-            dm_embed.set_footer(text="Dev Hub • devhub-official.vercel.app")
+            dm_embed.set_footer(text="Dev Hub • site-peach-iota-9e6xatqwnu.vercel.app")
             await owner.send(embed=dm_embed)
     except discord.Forbidden:
         pass
@@ -5642,7 +5642,7 @@ BOTILLION_BASE = "https://botillon.fr/api/v1"
 async def botillion_request(endpoint, method="GET", data=None):
     import subprocess
     import json as _json
-    proxy_url = f"https://devhub-official.vercel.app/api/botillion?endpoint={endpoint}"
+    proxy_url = f"https://site-peach-iota-9e6xatqwnu.vercel.app/api/botillion?endpoint={endpoint}"
     try:
         def _fetch():
             cmd = ["curl", "-s", "-m", "10", proxy_url]
@@ -5669,7 +5669,7 @@ botillion = app_commands.Group(name="botillion", description="Botillion integrat
 @app_commands.describe(member="Le membre a verifier")
 async def botillion_vote(interaction: discord.Interaction, member: discord.Member = None):
     target = member or interaction.user
-    verify_url = f"https://devhub-official.vercel.app/botillion/?page=check&user={target.id}&guild={interaction.guild.id}"
+    verify_url = f"https://site-peach-iota-9e6xatqwnu.vercel.app/botillion/?page=check&user={target.id}&guild={interaction.guild.id}"
     import discord as _d
     link_view = _d.ui.View()
     link_view.add_item(_d.ui.Button(label="Verifier mon vote", style=_d.ButtonStyle.link, url=verify_url))
@@ -5685,7 +5685,7 @@ async def botillion_vote(interaction: discord.Interaction, member: discord.Membe
 async def botillion_profile(interaction: discord.Interaction):
     import discord as _d
     link_view = _d.ui.View()
-    link_view.add_item(_d.ui.Button(label="Voir le profil", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=profile"))
+    link_view.add_item(_d.ui.Button(label="Voir le profil", style=_d.ButtonStyle.link, url="https://site-peach-iota-9e6xatqwnu.vercel.app/botillion/?page=profile"))
     await interaction.response.send_message("## Dev Hub — Profil Botillion", view=link_view, ephemeral=True)
 
 
@@ -5693,7 +5693,7 @@ async def botillion_profile(interaction: discord.Interaction):
 async def botillion_rank(interaction: discord.Interaction):
     import discord as _d
     link_view = _d.ui.View()
-    link_view.add_item(_d.ui.Button(label="Voir le rang", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=rank"))
+    link_view.add_item(_d.ui.Button(label="Voir le rang", style=_d.ButtonStyle.link, url="https://site-peach-iota-9e6xatqwnu.vercel.app/botillion/?page=rank"))
     await interaction.response.send_message("## Dev Hub — Rang Botillion", view=link_view, ephemeral=True)
 
 
@@ -5701,7 +5701,7 @@ async def botillion_rank(interaction: discord.Interaction):
 async def botillion_stats(interaction: discord.Interaction):
     import discord as _d
     link_view = _d.ui.View()
-    link_view.add_item(_d.ui.Button(label="Voir les stats", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=stats"))
+    link_view.add_item(_d.ui.Button(label="Voir les stats", style=_d.ButtonStyle.link, url="https://site-peach-iota-9e6xatqwnu.vercel.app/botillion/?page=stats"))
     await interaction.response.send_message("## Dev Hub — Stats Botillion", view=link_view, ephemeral=True)
 
 
@@ -5709,7 +5709,7 @@ async def botillion_stats(interaction: discord.Interaction):
 async def botillion_votes(interaction: discord.Interaction):
     import discord as _d
     link_view = _d.ui.View()
-    link_view.add_item(_d.ui.Button(label="Voir les votes", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=votes"))
+    link_view.add_item(_d.ui.Button(label="Voir les votes", style=_d.ButtonStyle.link, url="https://site-peach-iota-9e6xatqwnu.vercel.app/botillion/?page=votes"))
     await interaction.response.send_message("## Dev Hub — Votes Botillion", view=link_view, ephemeral=True)
 
 
@@ -5717,7 +5717,7 @@ async def botillion_votes(interaction: discord.Interaction):
 async def botillion_likes(interaction: discord.Interaction):
     import discord as _d
     link_view = _d.ui.View()
-    link_view.add_item(_d.ui.Button(label="Voir les likes", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=likes"))
+    link_view.add_item(_d.ui.Button(label="Voir les likes", style=_d.ButtonStyle.link, url="https://site-peach-iota-9e6xatqwnu.vercel.app/botillion/?page=likes"))
     await interaction.response.send_message("## Dev Hub — Likes Botillion", view=link_view, ephemeral=True)
 
 
@@ -5725,7 +5725,7 @@ async def botillion_likes(interaction: discord.Interaction):
 async def botillion_comments(interaction: discord.Interaction):
     import discord as _d
     link_view = _d.ui.View()
-    link_view.add_item(_d.ui.Button(label="Voir les avis", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=comments"))
+    link_view.add_item(_d.ui.Button(label="Voir les avis", style=_d.ButtonStyle.link, url="https://site-peach-iota-9e6xatqwnu.vercel.app/botillion/?page=comments"))
     await interaction.response.send_message("## Dev Hub — Avis Botillion", view=link_view, ephemeral=True)
 
 
@@ -7336,9 +7336,9 @@ AI_RANDOM = [
 ]
 
 AI_PROMPTS = {
-    "fr": "[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: choix de la langue\n\nCommandes naturelles: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nDonnees: MongoDB Atlas.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:",
-    "en": "[SYSTEM: You are Dev Hub, a Discord bot created by Zero (ID: 1167362445032050810). Site: https://devhub-official.vercel.app. Invite: https://discord.gg/vn6NEvATXZ. Reply in English, concise and funny. No emojis. You are NOT an LLM, you are Dev Hub, a Discord bot.\n\nYou know all your commands (78+ in 12 groups):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): shows commands by category\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: choose language\n\nNatural commands: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nData: MongoDB Atlas.\nIf asked who made you, say Zero. You are sarcastic but nice.]\n\n{user_name}: {message_content}\nDev Hub:",
-    "de": "[SYSTEM: Du bist Dev Hub, ein Discord-Bot erstellt von Zero (ID: 1167362445032050810). Seite: https://devhub-official.vercel.app. Einladung: https://discord.gg/vn6NEvATXZ. Antworte auf Deutsch, kurz und witzig. Keine Emojis. Du bist KEIN LLM, du bist Dev Hub, ein Discord-Bot.\n\nDu kennst alle deine Befehle (78+ in 12 Gruppen):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): Zeigt Befehle nach Kategorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: Sprache waehlen\n\nNatuerliche Befehle: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nDaten: MongoDB Atlas.\nWenn man dich fragt wer dich gemacht hat, sag Zero. Du bist sarcastisch aber nett.]\n\n{user_name}: {message_content}\nDev Hub:",
+    "fr": "[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://site-peach-iota-9e6xatqwnu.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: choix de la langue\n\nCommandes naturelles: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nDonnees: MongoDB Atlas.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:",
+    "en": "[SYSTEM: You are Dev Hub, a Discord bot created by Zero (ID: 1167362445032050810). Site: https://site-peach-iota-9e6xatqwnu.vercel.app. Invite: https://discord.gg/vn6NEvATXZ. Reply in English, concise and funny. No emojis. You are NOT an LLM, you are Dev Hub, a Discord bot.\n\nYou know all your commands (78+ in 12 groups):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): shows commands by category\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: choose language\n\nNatural commands: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nData: MongoDB Atlas.\nIf asked who made you, say Zero. You are sarcastic but nice.]\n\n{user_name}: {message_content}\nDev Hub:",
+    "de": "[SYSTEM: Du bist Dev Hub, ein Discord-Bot erstellt von Zero (ID: 1167362445032050810). Seite: https://site-peach-iota-9e6xatqwnu.vercel.app. Einladung: https://discord.gg/vn6NEvATXZ. Antworte auf Deutsch, kurz und witzig. Keine Emojis. Du bist KEIN LLM, du bist Dev Hub, ein Discord-Bot.\n\nDu kennst alle deine Befehle (78+ in 12 Gruppen):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): Zeigt Befehle nach Kategorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: Sprache waehlen\n\nNatuerliche Befehle: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nDaten: MongoDB Atlas.\nWenn man dich fragt wer dich gemacht hat, sag Zero. Du bist sarcastisch aber nett.]\n\n{user_name}: {message_content}\nDev Hub:",
 }
 
 AI_FALLBACKS = {
