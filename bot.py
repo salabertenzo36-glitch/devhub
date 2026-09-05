@@ -5681,68 +5681,15 @@ async def botillion_vote(interaction: discord.Interaction, member: discord.Membe
     )
 
 
-@botillion.command(name="rank", description="Voir le classement de Dev Hub sur Botillion")
-async def botillion_rank(interaction: discord.Interaction):
-    result = await botillion_request("/me/rank")
-    if not result or result.get("error"):
-        await interaction.response.send_message("**API Botillion** : Cloudflare bloque les requetes. Le proprietaire de botillon.fr doit whitelist les IP du bot.", ephemeral=True)
-        return
-
-    ranks = result.get("ranks", {})
-    percentiles = result.get("percentiles", {})
-    total = result.get("total_approved", 0)
-
-    view = view_text(
-        f"## Dev Hub — Rang Botillion",
-        f"**Classement parmi {total} bots**",
-        "",
-        f"**Votes** : #{ranks.get('votes', '?')} (top {percentiles.get('votes', '?')}%)",
-        f"**Likes** : #{ranks.get('likes', '?')} (top {percentiles.get('likes', '?')}%)",
-        f"**Serveurs** : #{ranks.get('servers', '?')} (top {percentiles.get('servers', '?')}%)",
-        f"**Avis** : #{ranks.get('comments', '?')} (top {percentiles.get('comments', '?')}%)",
+@botillion.command(name="link", description="Lien vers la fiche Botillion de Dev Hub")
+async def botillion_link(interaction: discord.Interaction):
+    import discord as _d
+    link_view = _d.ui.View()
+    link_view.add_item(_d.ui.Button(label="Voir sur Botillion", style=_d.ButtonStyle.link, url="https://botillon.fr/bot/1544077666473353256"))
+    await interaction.response.send_message(
+        "## Dev Hub sur Botillion\nVote, like, avis — tout est la !",
+        view=link_view, ephemeral=True
     )
-    await interaction.response.send_message(view=view)
-
-
-@botillion.command(name="stats", description="Stats detaillees de Dev Hub sur Botillion")
-async def botillion_stats(interaction: discord.Interaction):
-    result = await botillion_request("/me/stats?days=7")
-    if not result or result.get("error"):
-        await interaction.response.send_message("**API Botillion** : Cloudflare bloque les requetes. Le proprietaire de botillon.fr doit whitelist les IP du bot.", ephemeral=True)
-        return
-
-    totals = result.get("totals", {})
-    view = view_text(
-        "## Dev Hub — Stats Botillion",
-        f"**Votes** : `{totals.get('votes_24h', 0)}` (24h) · `{totals.get('votes_7d', 0)}` (7j) · `{totals.get('votes_30d', 0)}` (30j)",
-        f"**Votes actifs** : `{totals.get('active_votes', 0)}`",
-        f"**Likes** : `{totals.get('likes_24h', 0)}` (24h) · `{totals.get('likes_7d', 0)}` (7j) · `{totals.get('likes_30d', 0)}` (30j)",
-        f"**Avis** : `{totals.get('comments_24h', 0)}` (24h) · `{totals.get('comments_7d', 0)}` (7j) · `{totals.get('comments_30d', 0)}` (30j)",
-        f"**Visites** : `{totals.get('visits_24h', 0)}` (24h) · `{totals.get('visits_7d', 0)}` (7j) · `{totals.get('visits_30d', 0)}` (30j)",
-    )
-    await interaction.response.send_message(view=view)
-
-
-@botillion.command(name="profile", description="Voir le profil de Dev Hub sur Botillion")
-async def botillion_profile(interaction: discord.Interaction):
-    result = await botillion_request("/me")
-    if not result or result.get("error"):
-        await interaction.response.send_message("**API Botillion** : Cloudflare bloque les requetes. Le proprietaire de botillon.fr doit whitelist les IP du bot.", ephemeral=True)
-        return
-
-    bot_info = result.get("bot", {})
-    counts = result.get("counts", {})
-
-    view = view_text(
-        "## Dev Hub — Profil Botillion",
-        f"**Nom** : {bot_info.get('name', 'Dev Hub')}",
-        f"**Tagline** : {bot_info.get('tagline', '')}",
-        f"**Status** : {bot_info.get('status', 'unknown')}",
-        f"**Votes** : `{counts.get('votes_total', 0)}` total · `{counts.get('votes_active_12h', 0)}` actifs (12h)",
-        f"**Likes** : `{counts.get('likes', 0)}`",
-        f"**Avis** : `{counts.get('comments', 0)}`",
-    )
-    await interaction.response.send_message(view=view)
 
 
 # ──────────────────────────────────────────────
