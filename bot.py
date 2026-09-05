@@ -2200,12 +2200,16 @@ def make_help_view(category_key):
 
     options = []
     for key, val in HELP_CATEGORIES.items():
-        fallback = EMOJI_FALLBACKS.get(key, "❓")
+        emoji_str = val.get("emoji", "")
+        try:
+            partial = discord.PartialEmoji.from_str(emoji_str)
+        except Exception:
+            partial = EMOJI_FALLBACKS.get(key, "❓")
         options.append(discord.SelectOption(
             label=val["label"],
             value=key,
             description=f"{len(val['commands'])} commandes",
-            emoji=fallback
+            emoji=partial
         ))
 
     row = discord.ui.ActionRow()
