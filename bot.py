@@ -3666,6 +3666,99 @@ async def mod_log_cmd(interaction: discord.Interaction, channel: discord.TextCha
     await interaction.response.send_message(f"Logs de modération configurés dans {channel.mention}.")
 
 
+@mod.command(name="massrole", description="Ajoute un rôle à tous les membres du serveur")
+@app_commands.describe(role="Le rôle à attribuer", target="all, bot, ou human")
+@app_commands.choices(target=[
+    app_commands.Choice(name="👥 All", value="all"),
+    app_commands.Choice(name="🤖 Bots", value="bot"),
+    app_commands.Choice(name="👤 Humans", value="human"),
+])
+@mod_or_owner()
+async def massrole_cmd(interaction: discord.Interaction, role: discord.Role, target: str = "all"):
+    await interaction.response.defer(ephemeral=True)
+
+    if role >= interaction.guild.me.top_role:
+        return await interaction.followup.send("❌ Ce rôle est supérieur ou égal à mon rôle le plus haut.")
+
+    members = []
+    for m in interaction.guild.members:
+        if target == "bot" and m.bot:
+            members.append(m)
+        elif target == "human" and not m.bot:
+            members.append(m)
+        elif target == "all":
+            members.append(m)
+
+    if not members:
+        return await interaction.followup.send("❌ Aucun membre trouvé pour ce filtre.")
+
+    added = 0
+    skipped = 0
+    failed = 0
+
+    for member in members:
+        if role in member.roles:
+            skipped += 1
+            continue
+        try:
+            await member.add_roles(role, reason=f"Massrole by {interaction.user}")
+            added += 1
+        except discord.Forbidden:
+            failed += 1
+        except Exception:
+            failed += 1
+
+    await interaction.followup.send(
+        f"✅ Rôle {role.mention} attribué !\n"
+        f"**Ajouté :** {added} | **Déjà avoir :** {skipped} | **Échoué :** {failed}"
+    )
+
+
+@mod.command(name="massrole-remove", description="Retire un rôle à tous les membres du serveur")
+@app_commands.describe(role="Le rôle à retirer", target="all, bot, ou human")
+@app_commands.choices(target=[
+    app_commands.Choice(name="👥 All", value="all"),
+    app_commands.Choice(name="🤖 Bots", value="bot"),
+    app_commands.Choice(name="👤 Humans", value="human"),
+])
+@mod_or_owner()
+async def massrole_remove_cmd(interaction: discord.Interaction, role: discord.Role, target: str = "all"):
+    await interaction.response.defer(ephemeral=True)
+
+    members = []
+    for m in interaction.guild.members:
+        if target == "bot" and m.bot:
+            members.append(m)
+        elif target == "human" and not m.bot:
+            members.append(m)
+        elif target == "all":
+            members.append(m)
+
+    if not members:
+        return await interaction.followup.send("❌ Aucun membre trouvé pour ce filtre.")
+
+    removed = 0
+    skipped = 0
+    failed = 0
+
+    for member in members:
+        if role not in member.roles:
+            skipped += 1
+            continue
+        try:
+            await member.remove_roles(role, reason=f"Massrole remove by {interaction.user}")
+            removed += 1
+        except discord.Forbidden:
+            failed += 1
+        except Exception:
+            failed += 1
+
+    await interaction.followup.send(
+        f"✅ Rôle {role.mention} retiré !\n"
+        f"**Retiré :** {removed} | **N'avait pas :** {skipped} | **Échoué :** {failed}"
+    )
+
+
 # ──────────────────────────────────────────────
 #  UTILITAIRES
 # ──────────────────────────────────────────────
