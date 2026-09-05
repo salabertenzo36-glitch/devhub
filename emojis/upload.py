@@ -2,27 +2,25 @@ import requests
 import os
 import base64
 
-TOKEN = "MTU0MzAxMDEwOTYzMzA3NzI5OA.GhEOdk.1XDD3Pb4Pb9cMFA_5nGFuNAoYGPFqb-kan-G9s"
+import os
+TOKEN = os.environ.get("DISCORD_TOKEN", "")
 GUILD_ID = "1522408621256736878"
-EMOJI_DIR = "/Users/epsylon2/:eof/bot/emojis"
+EMOJI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "upload")
 
 headers = {
     "Authorization": f"Bot {TOKEN}"
 }
 
-# Names of our custom emojis
 OUR_EMOJIS = {
     "moderation", "mod_avancee", "vocal", "utilitaires", "fun", "stats",
     "hierarchie", "tickets", "ghostping", "welcome", "automod", "salon",
-    "bug", "suggestion", "support", "report", "autre"
+    "bug", "suggestion", "support", "report", "autre", "music", "cleanup"
 }
 
-# Get existing emojis
 r = requests.get(f"https://discord.com/api/v10/guilds/{GUILD_ID}/emojis", headers=headers)
 existing = r.json()
 print(f"Existing emojis: {len(existing)}")
 
-# Delete old versions of our emojis
 for e in existing:
     if e["name"] in OUR_EMOJIS:
         r = requests.delete(
@@ -31,7 +29,6 @@ for e in existing:
         )
         print(f"  Deleted: :{e['name']}: ({e['id']})")
 
-# Upload new versions
 for fname in sorted(os.listdir(EMOJI_DIR)):
     if not fname.endswith(".png"):
         continue
@@ -57,7 +54,6 @@ for fname in sorted(os.listdir(EMOJI_DIR)):
     else:
         print(f"  FAILED: {name} -> {r.status_code} {r.text[:200]}")
 
-# Final list
 r = requests.get(f"https://discord.com/api/v10/guilds/{GUILD_ID}/emojis", headers=headers)
 emojis = r.json()
 print(f"\nTotal emojis: {len(emojis)}")

@@ -23,7 +23,7 @@ payload = {
             "components": [
                 {
                     "type": 10,
-                    "content": "## <:tickets:1543707535796600942> **Système de Tickets**"
+                    "content": "## <:tickets:1545840989816492075> **Système de Tickets**"
                 },
                 {"type": 14},
                 {
@@ -31,12 +31,12 @@ payload = {
                     "content": (
                         "Besoin d'aide ou d'une création sur mesure ?\n"
                         "Ouvrez un ticket en sélectionnant le type de votre demande.\n\n"
-                        "<:bug:1543707511281156286> **Bug Report** — Signaler un bug ou une erreur\n"
-                        "<:suggestion:1543707532298559599> **Suggestion** — Proposer une amélioration\n"
-                        "<:support:1543707533858832567> **Support** — Besoin d'aide\n"
-                        "<:report:1543707527483494541> **Report** — Signaler un membre\n"
-                        "<:salon:1543707529039577128> **Création** — Demander une création\n"
-                        "<:autre:1543707509376680068> **Autre** — Autre demande"
+                        "<:bug:1545840958539833556> **Bug Report** — Signaler un bug ou une erreur\n"
+                        "<:suggestion:1545840985672650812> **Suggestion** — Proposer une amélioration\n"
+                        "<:support:1545840987312619590> **Support** — Besoin d'aide\n"
+                        "<:report:1545840979817402459> **Report** — Signaler un membre\n"
+                        "<:salon:1545840982220603443> **Création** — Demander une création\n"
+                        "<:autre:1545840955855212554> **Autre** — Autre demande"
                     )
                 },
                 {"type": 14},
@@ -52,12 +52,12 @@ payload = {
                             "custom_id": "ticket_select_persistent",
                             "placeholder": "Ouvrir un ticket...",
                             "options": [
-                                {"label": "Bug Report", "value": "bug", "description": "Signaler un bug ou une erreur", "emoji": {"name": "bug", "id": "1543707511281156286"}},
-                                {"label": "Suggestion", "value": "suggestion", "description": "Proposer une amélioration", "emoji": {"name": "suggestion", "id": "1543707532298559599"}},
-                                {"label": "Support", "value": "support", "description": "Besoin d'aide", "emoji": {"name": "support", "id": "1543707533858832567"}},
-                                {"label": "Report", "value": "report", "description": "Signaler un membre", "emoji": {"name": "report", "id": "1543707527483494541"}},
-                                {"label": "Création", "value": "creation", "description": "Demander une création sur mesure", "emoji": {"name": "salon", "id": "1543707529039577128"}},
-                                {"label": "Autre", "value": "autre", "description": "Autre demande", "emoji": {"name": "autre", "id": "1543707509376680068"}}
+                                {"label": "Bug Report", "value": "bug", "description": "Signaler un bug ou une erreur", "emoji": {"name": "bug", "id": "1545840958539833556"}},
+                                {"label": "Suggestion", "value": "suggestion", "description": "Proposer une amélioration", "emoji": {"name": "suggestion", "id": "1545840985672650812"}},
+                                {"label": "Support", "value": "support", "description": "Besoin d'aide", "emoji": {"name": "support", "id": "1545840987312619590"}},
+                                {"label": "Report", "value": "report", "description": "Signaler un membre", "emoji": {"name": "report", "id": "1545840979817402459"}},
+                                {"label": "Création", "value": "creation", "description": "Demander une création sur mesure", "emoji": {"name": "salon", "id": "1545840982220603443"}},
+                                {"label": "Autre", "value": "autre", "description": "Autre demande", "emoji": {"name": "autre", "id": "1545840955855212554"}}
                             ]
                         }
                     ]
