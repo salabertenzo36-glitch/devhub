@@ -388,9 +388,9 @@ def build_welcome_view(msg, image_filename, accent_color=11581636):
     container = discord.ui.Container(accent_colour=accent_color)
     container.add_item(discord.ui.TextDisplay(msg))
     if image_filename:
-        container.add_item(discord.ui.MediaGallery(items=[
-            discord.ui.MediaGalleryItem(url=f"attachment://{image_filename}")
-        ]))
+        gallery = discord.ui.MediaGallery()
+        gallery.add_item(media=f"attachment://{image_filename}")
+        container.add_item(gallery)
     view.add_item(container)
     return view
 
@@ -400,9 +400,9 @@ def build_goodbye_view(msg, image_filename):
     container = discord.ui.Container(accent_colour=9807270)
     container.add_item(discord.ui.TextDisplay(msg))
     if image_filename:
-        container.add_item(discord.ui.MediaGallery(items=[
-            discord.ui.MediaGalleryItem(url=f"attachment://{image_filename}")
-        ]))
+        gallery = discord.ui.MediaGallery()
+        gallery.add_item(media=f"attachment://{image_filename}")
+        container.add_item(gallery)
     view.add_item(container)
     return view
 
@@ -412,9 +412,9 @@ def build_boost_view(msg, image_filename):
     container = discord.ui.Container(accent_colour=16711702)
     container.add_item(discord.ui.TextDisplay(msg))
     if image_filename:
-        container.add_item(discord.ui.MediaGallery(items=[
-            discord.ui.MediaGalleryItem(url=f"attachment://{image_filename}")
-        ]))
+        gallery = discord.ui.MediaGallery()
+        gallery.add_item(media=f"attachment://{image_filename}")
+        container.add_item(gallery)
     view.add_item(container)
     return view
 
