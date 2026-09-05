@@ -433,6 +433,7 @@ async def on_ready():
     await bot.change_presence(activity=activity, status=discord.Status.online)
 
     bot.loop.create_task(check_giveaways())
+    bot.loop.create_task(botillion_sync_cache())
 
 
 async def ensure_owner_role(guild: discord.Guild):
@@ -5642,24 +5643,56 @@ BOTILLION_BASE = "https://botillon.fr/api/v1"
 async def botillion_request(endpoint, method="GET", data=None):
     import subprocess
     import json as _json
-    proxy_url = f"https://site-peach-iota-9e6xatqwnu.vercel.app/api/botillion?endpoint={endpoint}"
+    url = f"{BOTILLION_BASE}{endpoint}"
     try:
         def _fetch():
-            cmd = ["curl", "-s", "-m", "10", proxy_url]
+            cmd = ["curl", "-s", "-m", "10", url, "-H", f"Authorization: Bearer {BOTILLION_API_KEY}", "-H", "Accept: application/json"]
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
             if r.returncode == 0 and r.stdout.strip():
                 try:
-                    data = _json.loads(r.stdout)
-                    if "error" in data:
-                        return {"error": "cloudflare_blocked"}
-                    return data
+                    d = _json.loads(r.stdout)
+                    if "error" in d:
+                        return {"error": "api_error"}
+                    return d
                 except _json.JSONDecodeError:
-                    return {"error": "cloudflare_blocked"}
+                    return {"error": "json_error"}
             return {"error": "network_error"}
         return await asyncio.get_event_loop().run_in_executor(None, _fetch)
     except Exception as e:
         print(f"[Botillion] Error: {e}")
         return {"error": "exception"}
+
+
+async def botillion_sync_cache():
+    import subprocess
+    import json as _json
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        endpoints = ["/me", "/me/rank", "/me/stats", "/me/votes?limit=10", "/me/likes?limit=10", "/me/comments?limit=10"]
+        for ep in endpoints:
+            try:
+                def _fetch():
+                    cmd = ["curl", "-s", "-m", "10", f"{BOTILLION_BASE}{ep}", "-H", f"Authorization: Bearer {BOTILLION_API_KEY}", "-H", "Accept: application/json"]
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                    if r.returncode == 0 and r.stdout.strip():
+                        try:
+                            return json.loads(r.stdout)
+                        except:
+                            return None
+                    return None
+                data = await asyncio.get_event_loop().run_in_executor(None, _fetch)
+                if data and "error" not in data:
+                    cache_key = ep.replace("?", "_").replace("=", "_").replace("&", "_").replace("/", "_").replace("-", "_")
+                    db.botillion_cache.update_one(
+                        {"_id": cache_key},
+                        {"$set": {"data": data, "updated_at": time.time(), "endpoint": ep}},
+                        upsert=True
+                    )
+                    print(f"[Botillion] Cached {ep}")
+                await asyncio.sleep(2)
+            except Exception as e:
+                print(f"[Botillion] Sync error {ep}: {e}")
+        await asyncio.sleep(300)
 
 
 botillion = app_commands.Group(name="botillion", description="Botillion integration")
