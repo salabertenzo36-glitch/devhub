@@ -5669,8 +5669,8 @@ botillion = app_commands.Group(name="botillion", description="Botillion integrat
 @app_commands.describe(member="Le membre a verifier")
 async def botillion_vote(interaction: discord.Interaction, member: discord.Member = None):
     target = member or interaction.user
-    verify_url = f"https://devhub-official.vercel.app/botillion/?user={target.id}&guild={interaction.guild.id}&reward=5000"
-
+    verify_url = f"https://devhub-official.vercel.app/botillion/?page=check&user={target.id}&guild={interaction.guild.id}"
+    import discord as _d
     link_view = _d.ui.View()
     link_view.add_item(_d.ui.Button(label="Verifier mon vote", style=_d.ButtonStyle.link, url=verify_url))
     await interaction.response.send_message(
@@ -5679,6 +5679,54 @@ async def botillion_vote(interaction: discord.Interaction, member: discord.Membe
         f"Puis clique sur le bouton ci-dessous pour verifier ton vote.",
         view=link_view, ephemeral=True
     )
+
+
+@botillion.command(name="profile", description="Profil de Dev Hub sur Botillion")
+async def botillion_profile(interaction: discord.Interaction):
+    import discord as _d
+    link_view = _d.ui.View()
+    link_view.add_item(_d.ui.Button(label="Voir le profil", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=profile"))
+    await interaction.response.send_message("## Dev Hub — Profil Botillion", view=link_view, ephemeral=True)
+
+
+@botillion.command(name="rank", description="Classement de Dev Hub sur Botillion")
+async def botillion_rank(interaction: discord.Interaction):
+    import discord as _d
+    link_view = _d.ui.View()
+    link_view.add_item(_d.ui.Button(label="Voir le rang", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=rank"))
+    await interaction.response.send_message("## Dev Hub — Rang Botillion", view=link_view, ephemeral=True)
+
+
+@botillion.command(name="stats", description="Stats de Dev Hub sur Botillion")
+async def botillion_stats(interaction: discord.Interaction):
+    import discord as _d
+    link_view = _d.ui.View()
+    link_view.add_item(_d.ui.Button(label="Voir les stats", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=stats"))
+    await interaction.response.send_message("## Dev Hub — Stats Botillion", view=link_view, ephemeral=True)
+
+
+@botillion.command(name="votes", description="Historique des votes Botillion")
+async def botillion_votes(interaction: discord.Interaction):
+    import discord as _d
+    link_view = _d.ui.View()
+    link_view.add_item(_d.ui.Button(label="Voir les votes", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=votes"))
+    await interaction.response.send_message("## Dev Hub — Votes Botillion", view=link_view, ephemeral=True)
+
+
+@botillion.command(name="likes", description="Historique des likes Botillion")
+async def botillion_likes(interaction: discord.Interaction):
+    import discord as _d
+    link_view = _d.ui.View()
+    link_view.add_item(_d.ui.Button(label="Voir les likes", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=likes"))
+    await interaction.response.send_message("## Dev Hub — Likes Botillion", view=link_view, ephemeral=True)
+
+
+@botillion.command(name="comments", description="Historique des avis Botillion")
+async def botillion_comments(interaction: discord.Interaction):
+    import discord as _d
+    link_view = _d.ui.View()
+    link_view.add_item(_d.ui.Button(label="Voir les avis", style=_d.ButtonStyle.link, url="https://devhub-official.vercel.app/botillion/?page=comments"))
+    await interaction.response.send_message("## Dev Hub — Avis Botillion", view=link_view, ephemeral=True)
 
 
 @botillion.command(name="link", description="Lien vers la fiche Botillion de Dev Hub")
