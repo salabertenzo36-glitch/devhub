@@ -749,7 +749,7 @@ async def on_interaction(interaction: discord.Interaction):
                  "gp_channel", "gp_message", "gp_image", "gp_disable",
                  "bp_channel", "bp_message", "bp_image", "bp_disable",
                  "mp_automod", "mp_log", "mp_purge",
-                 "ai_on", "ai_off"):
+                 "ai_on", "ai_off", "ai_personality"):
         gid = str(interaction.guild.id) if interaction.guild else None
         settings = load_settings()
         if gid and gid not in settings:
