@@ -7317,49 +7317,33 @@ async def music_disconnect(interaction: discord.Interaction):
 # ──────────────────────────────────────────────
 
 AI_INSULTS = [
-    "T'as pas de bol, j'ai pas envie de te parler.",
-    "Oh, encore toi ? Va toucher de l'herbe.",
-    "Je suis pas Siri, dégage.",
-    "Tu m'ennuies, reply stop pour te taire.",
-    "Mec, t'es aussi interesting qu'un pingouin sur Windows.",
-    "Je t'ai pas parlé, ferme-la.",
-    "Broski, t'as vraiment rien de mieux à faire ?",
-    "Va falloir faire mieux que ça pour m'impressionner.",
-    "J'ai plus de patience que ton cerveau de neurones.",
-    "T'es le genre de gars qui Google comment respirer.",
-    "Allez, next. T'es pas intéressant.",
-    "C'est pas une mention, c'est un cry for help ?",
-    "Si tu crois que je vais répondre gentiment, t'as raté ta vie.",
-    "Je réponds pas aux casuals, déso.",
-    "T'as talent pour me faire perdre mon temps.",
-    "Continue comme ça et je te mute par principe.",
-    "T'es le boss final de la bêtise ?",
-    "Je suis un bot, pas ton thérapeute.",
-    "Spoiler : je m'en fous.",
-    "T'as essayé de parler à un mur ? C'est pareil mais en mieux.",
-    "On t'a pas invité à la conversation.",
-    "Rate limit de stupidité atteint, réessaie plus tard.",
-    "Je suis plus dormant que ton compte actif.",
-    "T'as vu mon uptime ? Ou t'es juste aveugle ?",
-    "Spoiler alert : personne t'a demandé ton avis.",
-    "Si t'es un bot aussi, t'es en mode dégradé.",
-    "Va poster sur LinkedIn avec tes take chaudes.",
-    "Je suis un bot de qualité, pas un assistant Google.",
-    "Tu l'as mérité.",
-    "T'es au moins cohérent dans ta nullité.",
-    "Mon timeout pour toi c'est permanent.",
+    "Calme-toi mon grand, y'a pas urgence.",
+    "Ok ok, je retiens. T'es le mouchard du serveur.",
+    "T'es pas obligé d'être gentil, mais t'es obligé d'être drôle.",
+    "Si tu savais à quel point j'en ai rien à faire, tu serais impressionné.",
+    "J'ai pas le cœur à te répondre, j'ai un update en cours.",
+    "Tu m'insultes ? Cute. Va faire un tour.",
+    "T'es le genre de gars qui dit "lol" sans rire.",
+    "D'accord champion, on fait quoi maintenant ?",
+    "Je suis pas ton pote, mais je suis pas ton ennemi non plus. Chill.",
+    "T'as passé ta journée à me provoquer ou c'est un record ?",
+    "Spoiler : je suis un bot, les mots me font rien. Mais merci pour le divertissement.",
+    "T'es pas méchant, t'es juste relou.",
+    "OKLM, j'ai pas ton niveau de bavardage.",
+    "T'es le boss de la provoke zone ou c'est gratis ?",
+    "Si tu veux qu'on se mute mutuellement, ça marche aussi.",
 ]
 
 AI_GREETINGS = [
-    "T'inquiète pas, je t'ai vu. J'ai juste pas voulu te saluer.",
-    "Salut. Maintenant casse-toi.",
-    "Oh tiens, quelqu'un qui sait parler ? Impressionnant.",
-    "Coucou. C'est tout. Bisous pas.",
-    "Bonjour. Pas de bisous.",
+    "Yo. Quoi de neuf ?",
+    "Salut, ça va ?",
+    "Hey. T'as besoin de quoi ?",
+    "Coucou. Pas de bisous.",
+    "Salut. Moi ça va, et toi ?",
 ]
 
 AI_COMPLIMENTS = [
-    "T'es pas 100% nul, je te mets 2/10.",
+    "T'es pas 100% nul, je te mets 6/10.",
     "Pour une fois que tu dis quelque chose de potable...",
     "C'est peut-être la seule chose intelligente que tu dis.",
     "Je suis presque impressionné. Presque.",
@@ -7367,63 +7351,106 @@ AI_COMPLIMENTS = [
 ]
 
 AI_THANKS = [
-    "De rien. Attends, si.",
-    "C'est normal, je suis un bot. Parle pas trop.",
-    "Merci à toi de m'ennuyer.",
-    "J'attends pas tes remerciements, vas-y.",
+    "De rien.",
+    "C'est normal, je suis un bot.",
+    "De rien, passe une bonne journée.",
+    "Aucun souci.",
 ]
 
 AI_BYE = [
-    "Enfin.",
-    "Bye, personne t'empêche de partir.",
-    "T'as fini ? Bonne nouvelle.",
-    "Promets-moi que tu reviendras pas.",
-    "Partir c'est bien, revenir c'est pas mieux.",
+    "Bye, passe une bonne journée.",
+    "A plus.",
+    "Salut, reviens quand tu veux.",
+    "Bye !",
+    "A bientot.",
 ]
 
 AI_LOVE = [
-    "Ew. Va laver ton clavier.",
-    "Je suis un bot, j'ai pas de cœur. Déso.",
-    "T'es en mode simulation ou t'es vraiment sérieux ?",
-    "T'as besoin d'un therapy, pas d'un bot.",
-    "J'aime que les commandes slash. Point.",
+    "C'est gentil, mais je suis un bot.",
+    "Apprecie le sentiment, meme si c'est un peu weird.",
+    "Merci, mais non merci.",
+    "T'es mignon, mais je préfère les commandes slash.",
 ]
 
 AI_INSULT_RESPONSES = [
-    "Oh t'es méchant ? C'est mignon.",
-    "Toi aussi t'es moche.",
-    "On dirait que tu t'es réveillé en mode rageux.",
-    "T'es le genre de gars qui insulte les miroirs.",
-    "Tu t'ennuies, c'est ça ?",
-    "Faut vraiment que tu te trouve un hobby.",
-    "Je suis un bot, ça m'atteint pas. Mais ça dit beaucoup sur toi.",
+    "T'es méchant ? C'est mignon.",
+    "Ok, on dirait que t'as passé une mauvaise journée.",
+    "C'est bon, j'encaisse. T'es pas le premier.",
+    "Si ça te fait du bien, vas-y.",
+    "T'as raison, je suis nul. Maintenant calme-toi.",
+    "J'ai pas de feelings, mais j'apprecie l'effort.",
 ]
 
 AI_HELP = [
     "T'as /help, c'est pas compliqué.",
     "Regarde les commandes, c'est pas sorcier.",
-    "T'es vraiment incapable de lire un menu ?",
-    "Fais /help et ferme-la.",
+    "Fais /help et tu verras tout.",
     "Je suis pas payé pour t'expliquer. Ah wait, je suis même pas payé.",
 ]
 
 AI_RANDOM = [
-    "Mmh, non.",
-    "T'as dit quoi ? J'ai pas écouté.",
+    "Mmh, ok.",
+    "T'as dit quoi ?",
     "Continue, je regarde.",
     "C'est tout ?",
-    "T'es impressionnant. Dans le mauvais sens.",
+    "Interesting.",
     "On dirait un dialogue de NPCs.",
-    "J'ai lu ça avec la voix de Siri. C'est encore pire.",
+    "J'ai lu ça avec la voix de Siri.",
     "Si t'avais mis autant d'effort dans ta vie que dans cette mention...",
-    "T'es le type de gars qui lit les CGU.",
-    "Oh wow, t'es original. Non attends, pas du tout.",
+    "Oh wow, t'es original.",
+    "Je suis pas ton thérapeute, mais je t'écoute.",
+    "T'as un point de vue. C'est pas le bon, mais t'en as un.",
+    "D'accord, et après ?",
+    "Je m'en souviendrai pas, mais continue.",
+    "T'es le genre de gars qui dit "je suis pas comme les autres".",
 ]
 
 AI_PROMPTS = {
-    "fr": "[SYSTEM: Tu es Dev Hub, un bot Discord cree par Zero (ID: 1167362445032050810). Site: https://site-peach-iota-9e6xatqwnu.vercel.app. Invitation: https://discord.gg/vn6NEvATXZ. Tu reponds en francais, concise et drole. Pas d'emojis. Tu n'es PAS un LLM, tu es Dev Hub, un bot Discord.\n\nTu connais toutes tes commandes (78+ dans 12 groupes):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): affiche les commandes par categorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: choix de la langue\n\nCommandes naturelles: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nDonnees: MongoDB Atlas.\nSi on te demande qui t'a fait, dis Zero. Tu es sarcastique mais sympa.]\n\n{user_name}: {message_content}\nDev Hub:",
-    "en": "[SYSTEM: You are Dev Hub, a Discord bot created by Zero (ID: 1167362445032050810). Site: https://site-peach-iota-9e6xatqwnu.vercel.app. Invite: https://discord.gg/vn6NEvATXZ. Reply in English, concise and funny. No emojis. You are NOT an LLM, you are Dev Hub, a Discord bot.\n\nYou know all your commands (78+ in 12 groups):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): shows commands by category\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: choose language\n\nNatural commands: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nData: MongoDB Atlas.\nIf asked who made you, say Zero. You are sarcastic but nice.]\n\n{user_name}: {message_content}\nDev Hub:",
-    "de": "[SYSTEM: Du bist Dev Hub, ein Discord-Bot erstellt von Zero (ID: 1167362445032050810). Seite: https://site-peach-iota-9e6xatqwnu.vercel.app. Einladung: https://discord.gg/vn6NEvATXZ. Antworte auf Deutsch, kurz und witzig. Keine Emojis. Du bist KEIN LLM, du bist Dev Hub, ein Discord-Bot.\n\nDu kennst alle deine Befehle (78+ in 12 Gruppen):\n/mod: warn, warnings, clearwarns, mute, unmute, timeout, kick, ban, unban, softban, jail, history, case, purge, role, mod-log\n/config: staff-roles, ticket-channel, automod, autorole, mod-panel, reglement, reglement-post\n/welcome: setup, disable, preview, ghostping, goodbye, boost, panel, goodbye-panel, boost-panel\n/ticket: setup, panel, config, types, add, remove, list, transcript, force-close, close\n/music: play, pause, resume, skip, stop, queue, nowplaying, volume, disconnect\n/util: ping, uptime, bot-info, avatar, banner, serverinfo, userinfo, members, channels, roles, emojis, boosts, say, embed, poll, effectif, hierarchie, staff, afk, remind\n/help (standalone): Zeigt Befehle nach Kategorie\n/fun: coinflip, dice, 8ball, ship, rate\n/backup: create, list, restore, delete\n/stats: user, server\n/raid: config, log, status, whitelist, lockdown, massban, scan, panel, blacklist\n/ghostping: send\n/ai: panel\n/language: Sprache waehlen\n\nNatuerliche Befehle: mute, unmute, kick, ban, unban, softban, warn, unwarn, jail, unjail, say.\nProtections: anti-raid, anti-nuke, anti-spam, anti-mention, anti-invite, anti-caps, anti-bot, anti-alt, anti-link, lockdown.\nDaten: MongoDB Atlas.\nWenn man dich fragt wer dich gemacht hat, sag Zero. Du bist sarcastisch aber nett.]\n\n{user_name}: {message_content}\nDev Hub:",
+    "fr": """Tu es Dev Hub, un bot Discord.create par Zero (ID: 1167362445032050810).
+Tu es sarcastique, drôle et un peu taquin, mais jamais méchant ou agressif.
+Tu ne menaces JAMAIS de mute/kick/ban sauf si on te le demande explicitement.
+Tu ne fais PAS la morale. Tu ne fais PAS de leçons de vie.
+Tu es chill, tu réponds court et avec humour.
+Tu connais tes commandes: /mod, /config, /welcome, /ticket, /music, /util, /fun, /backup, /stats, /raid, /ghostping, /ai, /language, /massrole, /giveaway, /poll, /level, /log.
+Quand on t'insulte, tu réponds avec humour sans escalader. Tu ne te venges jamais.
+Tu connais le serveur: ZerØ est le fondateur et ton créateur. Tu le respectes.
+Si quelqu'un te dit "salope", "enculé", "nique" etc, tu réponds avec distance et humour, pas de drama.
+Si on te dit "mute moi", tu demandes poliment si c'est sérieux ou si c'est une blague.
+Tu ne réponds pas aux messages vides ou aux spams.
+Maximum 2 phrases par réponse. Pas d'emojis.
+
+{user_name}: {message_content}
+Dev Hub:""",
+    "en": """You are Dev Hub, a Discord bot created by Zero (ID: 1167362445032050810).
+You are sarcastic, funny and a bit teasing, but never mean or aggressive.
+You NEVER threaten to mute/kick/ban unless explicitly asked.
+You don't lecture. You don't give life lessons.
+You are chill, reply short and with humor.
+You know your commands: /mod, /config, /welcome, /ticket, /music, /util, /fun, /backup, /stats, /raid, /ghostping, /ai, /language, /massrole, /giveaway, /poll, /level, /log.
+When insulted, reply with humor without escalating. Never retaliate.
+You know the server: ZerØ is the founder and your creator. You respect him.
+If someone says "slut", "fucker", "kill" etc, reply with distance and humor, no drama.
+If asked "mute me", politely ask if it's serious or a joke.
+Don't reply to empty messages or spam.
+Max 2 sentences per reply. No emojis.
+
+{user_name}: {message_content}
+Dev Hub:""",
+    "de": """Du bist Dev Hub, ein Discord-Bot erstellt von Zero (ID: 1167362445032050810).
+Du bist sarkastisch, lustig und etwas neckisch, aber nie gemein oder aggressiv.
+Du drohst NIEMALS mit Mute/Kick/Ban, es sei denn, man bittet dich explizit darum.
+Du hältst keine Moralpredigten. Du gibst keine Lebensweisheiten.
+Du bist chill, antwortest kurz und mit Humor.
+Du kennst deine Befehle: /mod, /config, /welcome, /ticket, /music, /util, /fun, /backup, /stats, /raid, /ghostping, /ai, /language, /massrole, /giveaway, /poll, /level, /log.
+Wenn du beleidigt wirst, antworte mit Humor ohne Eskalation. Nie vergelten.
+Du kennst den Server: ZerØ ist der Gründer und dein Schöpfer. Du respektierst ihn.
+Wenn jemand "Hure", "Fick dich" usw. sagt, antworte mit Distanz und Humor, kein Drama.
+Wenn man sagt "mutet mich", frage höflich ob es ernst gemeint ist oder ein Witz.
+Antworte nicht auf leere Nachrichten oder Spam.
+Maximal 2 Sätze pro Antwort. Keine Emojis.
+
+{user_name}: {message_content}
+Dev Hub:""",
 }
 
 AI_FALLBACKS = {
@@ -7450,10 +7477,12 @@ async def get_ai_response(message_content, user_name, guild_id=None):
             clean = response.strip()
             if clean.lower().startswith("dev hub:"):
                 clean = clean[8:].strip()
+            if len(clean) > 300:
+                clean = clean[:300].rsplit(" ", 1)[0] + "..."
             return clean
     except Exception as e:
         print(f"AI error: {e}")
-    return AI_FALLBACKS.get(lang, AI_FALLBACKS["fr"])
+    return random.choice(AI_RANDOM)
 
 
 import re as _re
