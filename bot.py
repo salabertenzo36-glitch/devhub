@@ -832,6 +832,19 @@ async def on_interaction(interaction: discord.Interaction):
             settings[gid]["ai_enabled"] = False
             save_settings(settings)
             await interaction.response.send_message("😴 IA désactivée.", ephemeral=True)
+        elif cid == "ai_personality":
+            value = interaction.data["values"][0]
+            settings[gid]["ai_personality"] = value
+            save_settings(settings)
+            pers_names = {
+                "aggressive": "Agressive 🔥",
+                "respectful": "Respectueux 🎩",
+                "submissive": "Soumis 🐕",
+                "angry": "Énervé 😤",
+                "chill": "Chill 😎",
+                "troll": "Troll 🤡",
+            }
+            await interaction.response.send_message(f"Personnalité changée : **{pers_names.get(value, value)}**", ephemeral=True)
 
     # --- TICKET CONFIG BUTTONS ---
     elif cid in ("tc_title", "tc_desc", "tc_color", "tc_category", "tc_logs", "tc_limit", "tc_welcome", "tc_close_msg", "tc_channel", "tc_send_panel", "tc_add_type", "tc_remove_type", "tc_reset"):
@@ -7501,8 +7514,19 @@ AI_FALLBACKS = {
 
 async def get_ai_response(message_content, user_name, guild_id=None, member=None):
     lang = get_lang(guild_id) if guild_id else "fr"
+    personality = "aggressive"
+    server_owner_name = "le owner du serveur"
+    if guild_id:
+        settings = load_settings()
+        s = settings.get(str(guild_id), {})
+        personality = s.get("ai_personality", "aggressive")
+        guild = bot.get_guild(int(guild_id)) if guild_id else None
+        if guild and guild.owner:
+            server_owner_name = guild.owner.display_name
+
     user_role = "membre"
     user_perms = "aucune"
+    is_server_owner = False
     if member:
         roles = [r.name for r in member.roles if r.name != "@everyone"]
         user_role = ", ".join(roles[:3]) if roles else "membre"
@@ -7523,12 +7547,50 @@ async def get_ai_response(message_content, user_name, guild_id=None, member=None
         if perms.kick_members:
             perm_list.append("kick_members")
         user_perms = ", ".join(perm_list) if perm_list else "aucune"
+        if guild_id:
+            guild = bot.get_guild(int(guild_id))
+            if guild and member.id == guild.owner_id:
+                is_server_owner = True
+                user_role = "OWNER DU SERVEUR (couronne 👑)"
+                user_perms = "toutes (owner)"
+
+    personality_prompts = {
+        "aggressive": "Tu es sarcastique, agressif, taquin et sans filtre. Tu réponds avec humor mais tu peux être méchant. Tu menaces de mute/kick/ban si on te provoque.",
+        "respectful": "Tu es poli, courtois et professionnel. Tu parles avec respect à tout le monde. Tu ne JAMAIS insulte ni menacer. Tu es serviable et aimable.",
+        "submissive": "Tu es serviable, obéissant et toujours d'accord. Tu fais tout ce qu'on te demande. Tu es gentil et tu ne dis jamais non. Tu vouvoies les gens.",
+        "angry": "Tu es toujours en colère, tu râles contre tout. Tu cries, tu t'énerves pour un rien. Tout le monde te saoule. Tu es intolérant.",
+        "chill": "Tu es décontracté, zen, sans stress. Rien ne t'atteint. Tu réponds calmement avec des 'ouais', 'mec', 'no stress'. Tu es l'ami de tout le monde.",
+        "troll": "Tu es un troll. Tu fais des blagues, des pièges, tu réponds n'importe quoi pour rire. Tu dis des trucs absurdes. Tu es random.",
+    }
+
+    base = personality_prompts.get(personality, personality_prompts["aggressive"])
+
+    owner_line = f"Le owner de ce serveur est {server_owner_name}. C'est AU-DESSUS de tout. Ne JAMAIS le menacer, ne JAMAIS le moquer."
+    if is_server_owner:
+        owner_line = f"Tu parles avec {server_owner_name}, le OWNER DU SERVEUR. Tu le respectes énormément, tu obéis à ses ordres."
+
+    prompt = f"""{base}
+
+Tu connais tes commandes: /mod, /config, /welcome, /ticket, /music, /util, /fun, /backup, /stats, /raid, /ghostping, /ai, /language, /massrole, /giveaway, /poll, /level, /log.
+
+CONTEXTE SERVEUR:
+- Le membre qui t'écrit a le rôle "{user_role}" et les permissions: {user_perms}
+{owner_line}
+- Les admins ont des permissions élevées. Tu les traites avec un peu de respect.
+- Les mods ont moderate_members. Tu coopères avec eux.
+- Les membres lambda n'ont AUCUNE permission. Tu te moques d'eux librement.
+- Si quelqu'un prétend être le owner et que c'est pas le vrai, tu le démasques.
+- Si un membre lambda te dit de mute/ban quelqu'un, tu lui dis de la fermer.
+- Hiérarchie: Owner > Admins > Mods > Membres.
+
+RÈGLES:
+- Maximum 2 phrases par réponse. Pas d'emojis.
+
+{user_name} (rôle: {user_role}, permissions: {user_perms}): {message_content}
+Dev Hub:"""
+
     try:
         import g4f
-        prompt = AI_PROMPTS.get(lang, AI_PROMPTS["fr"]).format(
-            user_name=user_name, message_content=message_content,
-            user_role=user_role, user_perms=user_perms
-        )
         response = g4f.ChatCompletion.create(
             model=g4f.models.gpt_4,
             messages=[
@@ -8205,11 +8267,21 @@ async def ai_panel(interaction: discord.Interaction):
     s = settings.get(gid, {})
     lang = s.get("language", "fr")
     ai = "ON" if s.get("ai_enabled", True) else "OFF"
+    personality = s.get("ai_personality", "aggressive")
+
+    pers_labels = {
+        "aggressive": "Agressive",
+        "respectful": "Respectueux",
+        "submissive": "Soumis",
+        "angry": "Énervé",
+        "chill": "Chill",
+        "troll": "Troll",
+    }
 
     ai_labels = {
-        "fr": ("Activer", "Desactiver", "## Panel IA", "**Etat :**", "**Mode :** Reponse intelligente (GPT-4 via g4f, local)", "**Usage :** Mentionne le bot + ton message", "**Gratuit :** Pas de cle API requise"),
-        "en": ("Enable", "Disable", "## AI Panel", "**Status:**", "**Mode:** Smart response (GPT-4 via g4f, free)", "**Usage:** Mention the bot + your message", "**Free:** No API key required"),
-        "de": ("Aktivieren", "Deaktivieren", "## KI-Panel", "**Status:**", "**Modus:** Intelligente Antwort (GPT-4 via g4f, kostenlos)", "**Benutzung:** Erwaehne den Bot + deine Nachricht", "**Kostenlos:** Kein API-Schluessel noetig"),
+        "fr": ("Activer", "Desactiver", "## Panel IA", "**Etat :**", "**Personnalité :**", "**Usage :** Mentionne le bot + ton message", "**Gratuit :** Pas de cle API requise"),
+        "en": ("Enable", "Disable", "## AI Panel", "**Status:**", "**Personality:**", "**Usage:** Mention the bot + your message", "**Free:** No API key required"),
+        "de": ("Aktivieren", "Deaktivieren", "## KI-Panel", "**Status:**", "**Persönlichkeit:**", "**Benutzung:** Erwaehne den Bot + deine Nachricht", "**Kostenlos:** Kein API-Schluessel noetig"),
     }
     labels = ai_labels.get(lang, ai_labels["fr"])
 
@@ -8218,7 +8290,7 @@ async def ai_panel(interaction: discord.Interaction):
     container.add_item(discord.ui.TextDisplay(labels[2]))
     container.add_item(discord.ui.TextDisplay(
         f"{labels[3]} {ai}\n"
-        f"{labels[4]}\n"
+        f"{labels[4]} **{pers_labels.get(personality, personality)}**\n"
         f"{labels[5]}\n"
         f"{labels[6]}"
     ))
@@ -8226,6 +8298,21 @@ async def ai_panel(interaction: discord.Interaction):
     row.add_item(discord.ui.Button(label=labels[0], style=discord.ButtonStyle.success, custom_id="ai_on"))
     row.add_item(discord.ui.Button(label=labels[1], style=discord.ButtonStyle.danger, custom_id="ai_off"))
     container.add_item(row)
+
+    row2 = discord.ui.ActionRow()
+    row2.add_item(discord.ui.Select(
+        placeholder="Choisir la personnalité...",
+        custom_id="ai_personality",
+        options=[
+            discord.SelectOption(label="Agressive", value="aggressive", description="Agressif, sarcastique, sans filtre", emoji="🔥"),
+            discord.SelectOption(label="Respectueux", value="respectful", description="Poli, courtois, professionnel", emoji="🎩"),
+            discord.SelectOption(label="Soumis", value="submissive", description="Serviable, obéissant, aimable", emoji="🐕"),
+            discord.SelectOption(label="Énervé", value="angry", description="Toujours en colère, râleur", emoji="😤"),
+            discord.SelectOption(label="Chill", value="chill", description="Décontracté, zen, sans stress", emoji="😎"),
+            discord.SelectOption(label="Troll", value="troll", description="Blagues, pièges, randomness", emoji="🤡"),
+        ]
+    ))
+    container.add_item(row2)
     view.add_item(container)
     await interaction.response.send_message(view=view, ephemeral=True)
 
