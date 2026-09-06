@@ -6568,13 +6568,31 @@ async def on_message_level(message):
     save_economy_data(eco)
 
     if new_level > old_level:
-        msg = cfg["level_up_message"].replace("{user}", message.author.mention).replace("{level}", str(new_level))
+        xp_needed = (new_level - 1) ** 2 * 100
+        xp_next = new_level ** 2 * 100
+        progress = data["xp"] - xp_needed
+        needed = xp_next - xp_needed
+        pct = int((progress / needed) * 100) if needed > 0 else 0
+        bar_len = 12
+        filled = int((pct / 100) * bar_len)
+        bar = "▰" * filled + "▱" * (bar_len - filled)
+
+        view = discord.ui.LayoutView()
+        container = discord.ui.Container(accent_colour=11581636)
+        container.add_item(discord.ui.TextDisplay(f"## 🎚️〃Niveau supérieur !\n{message.author.mention} passe au **niveau {new_level}** !"))
+        container.add_item(discord.ui.Separator())
+        container.add_item(discord.ui.TextDisplay(f"**Progression**\n`{progress} / {needed}` XP ({pct}%)\n`{bar}`"))
+        row = discord.ui.ActionRow()
+        row.add_item(discord.ui.Button(label="Voir mon profil", style=discord.ButtonStyle.primary, custom_id=f"profile_{message.author.id}"))
+        container.add_item(row)
+        view.add_item(container)
+
         if cfg["level_channel"]:
             channel = message.guild.get_channel(int(cfg["level_channel"]))
             if channel:
-                await channel.send(msg)
+                await channel.send(view=view)
         else:
-            await message.channel.send(msg, delete_after=10)
+            await message.channel.send(view=view, delete_after=15)
 
         rewards = cfg.get("level_role_rewards", {})
         role_id = rewards.get(str(new_level))
@@ -6605,16 +6623,38 @@ async def level_view(interaction: discord.Interaction, member: discord.Member = 
     progress = xp - xp_needed
     needed = xp_next - xp_needed
     pct = int((progress / needed) * 100) if needed > 0 else 0
-    bar_len = 20
+    bar_len = 12
     filled = int((pct / 100) * bar_len)
-    bar = "█" * filled + "░" * (bar_len - filled)
+    bar = "▰" * filled + "▱" * (bar_len - filled)
 
-    view = view_text(
-        f"## Niveau de {target.display_name}",
-        f"**Niveau** `{level}`",
-        f"**XP** `{xp}` (prochain: `{xp_next}`)",
-        f"**Progression** [{bar}] `{pct}%`",
-    )
+    eco_data = load_economy()
+    g = eco_data.get(gid, {})
+    sorted_users = sorted(g.items(), key=lambda x: x[1].get("xp", 0), reverse=True)
+    rank = "#?"
+    for i, (uid2, _) in enumerate(sorted_users):
+        if uid2 == uid:
+            rank = f"#{i+1}"
+            break
+
+    view = discord.ui.LayoutView()
+    container = discord.ui.Container(accent_colour=11581636)
+    if target.display_avatar:
+        section = discord.ui.Section(
+            accessory=discord.ui.Thumbnail(media=target.display_avatar.url, description=target.display_name)
+        )
+        section.add_item(discord.ui.TextDisplay(f"## {target.display_name}"))
+        container.add_item(section)
+    else:
+        container.add_item(discord.ui.TextDisplay(f"## {target.display_name}"))
+    container.add_item(discord.ui.Separator())
+    container.add_item(discord.ui.TextDisplay(
+        f"**Rang** `{rank}`\n"
+        f"**Niveau** `{level}`\n"
+        f"**XP total** `{xp}`\n"
+        f"**Progression** `{progress} / {needed}` XP ({pct}%)\n"
+        f"`{bar}`"
+    ))
+    view.add_item(container)
     await interaction.response.send_message(view=view)
 
 
