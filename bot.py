@@ -1954,6 +1954,8 @@ HELP_CATEGORIES = {
             "`/mod case` — Voir un case",
             "`/mod purge` — Supprimer des messages",
             "`/mod role` — Ajouter/retirer un rôle",
+            "`/mod massrole` — Ajouter un rôle à tous",
+            "`/mod massrole-remove` — Retirer un rôle à tous",
             "`/mod mod-log` — Configurer les logs",
         ]
     },
@@ -2097,7 +2099,7 @@ HELP_CATEGORIES = {
         "label": "IA Insolente",
         "emoji": "<:sparkle:1545844091739443220>",
         "commands": [
-            "`/ai panel` — Panel de configuration",
+            "`/ai panel` — Panel de configuration + personnalité",
         ]
     },
     "language": {
