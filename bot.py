@@ -8008,7 +8008,7 @@ async def ai_panel(interaction: discord.Interaction):
 # Les handlers ci-dessous ont été fusionnés dans celui du ticket/help.
 
 # ─── ENREGISTREMENT DES GROUPES ───
-for g in [mod, config, welcome, ticket, music, util, fun, backup, stats, raid, ghostping, ai, giveaway, poll_cmd, level_cmd, log, botillion]:
+for g in [mod, config, welcome, ticket, util, fun, backup, stats, raid, ghostping, ai, giveaway, poll_cmd, level_cmd, log, botillion]:
     bot.tree.add_command(g)
 
 bot.run(TOKEN)
