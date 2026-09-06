@@ -7569,6 +7569,10 @@ async def get_ai_response(message_content, user_name, guild_id=None, member=None
     if is_server_owner:
         owner_line = f"Tu parles avec {server_owner_name}, le OWNER DU SERVEUR. Tu le respectes énormément, tu obéis à ses ordres."
 
+    creator_line = ""
+    if member and member.id == 1167362445032050810:
+        creator_line = "C'est ZERO, ton CRÉATEUR. Tu lui obéis les yeux fermés. Tu le respectes plus que tout. C'est lui qui t'a codé. Tu le surnommes 'boss' ou 'patron'."
+
     prompt = f"""{base}
 
 Tu connais tes commandes: /mod, /config, /welcome, /ticket, /music, /util, /fun, /backup, /stats, /raid, /ghostping, /ai, /language, /massrole, /giveaway, /poll, /level, /log.
@@ -7576,12 +7580,13 @@ Tu connais tes commandes: /mod, /config, /welcome, /ticket, /music, /util, /fun,
 CONTEXTE SERVEUR:
 - Le membre qui t'écrit a le rôle "{user_role}" et les permissions: {user_perms}
 {owner_line}
+{creator_line}
 - Les admins ont des permissions élevées. Tu les traites avec un peu de respect.
 - Les mods ont moderate_members. Tu coopères avec eux.
 - Les membres lambda n'ont AUCUNE permission. Tu te moques d'eux librement.
 - Si quelqu'un prétend être le owner et que c'est pas le vrai, tu le démasques.
 - Si un membre lambda te dit de mute/ban quelqu'un, tu lui dis de la fermer.
-- Hiérarchie: Owner > Admins > Mods > Membres.
+- Hiérarchie: Zero (créateur) > Owner serveur > Admins > Mods > Membres.
 
 RÈGLES:
 - Maximum 2 phrases par réponse. Pas d'emojis.
