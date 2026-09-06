@@ -6210,7 +6210,7 @@ async def on_guild_channel_update(before, after):
     changes = []
     if before.name != after.name:
         changes.append(f"**Nom** `{before.name}` → `{after.name}`")
-    if before.topic != after.topic:
+    if isinstance(after, discord.TextChannel) and before.topic != after.topic:
         changes.append(f"**Sujet** `{(before.topic or '')[:100]}` → `{(after.topic or '')[:100]}`")
     if changes:
         await log_send(before.guild, cfg, "Channel Update", [
