@@ -7172,6 +7172,144 @@ async def play_next(guild_id):
         await play_next(guild_id)
 
 
+# ─── MUSIC COMMANDS ───
+
+@music.command(name="play", description="Joue une musique YouTube")
+@app_commands.describe(query="Nom ou URL YouTube")
+async def music_play(interaction: discord.Interaction, query: str):
+    await interaction.response.defer()
+
+    vc = interaction.user.voice
+    if not vc or not vc.channel:
+        return await interaction.followup.send("❌ Tu dois être dans un salon vocal.")
+
+    gid = interaction.guild.id
+    player = music_players.get(gid)
+    if not player:
+        player = MusicPlayer(gid)
+        music_players[gid] = player
+
+    track = await search_ytdlp(query)
+    if not track:
+        return await interaction.followup.send("❌ Aucun résultat trouvé.")
+
+    player.queue.append(track)
+    player.channel = interaction.channel
+
+    if not interaction.guild.voice_client:
+        player.voice_client = await vc.channel.connect(self_deaf=True)
+    else:
+        player.voice_client = interaction.guild.voice_client
+
+    if not player.voice_client.is_playing() and not player.voice_client.is_paused():
+        await play_next(gid)
+
+    await interaction.followup.send(f"✅ Ajouté à la file : **{track['title']}** (`{format_duration(track['duration'])}`)")
+
+
+@music.command(name="pause", description="Met la musique en pause")
+async def music_pause(interaction: discord.Interaction):
+    vc = interaction.guild.voice_client
+    if vc and vc.is_playing():
+        vc.pause()
+        await interaction.response.send_message("⏸️ Musique en pause.")
+    else:
+        await interaction.response.send_message("❌ Rien n'est en cours de lecture.", ephemeral=True)
+
+
+@music.command(name="resume", description="Reprend la musique")
+async def music_resume(interaction: discord.Interaction):
+    vc = interaction.guild.voice_client
+    if vc and vc.is_paused():
+        vc.resume()
+        await interaction.response.send_message("▶️ Musique reprise.")
+    else:
+        await interaction.response.send_message("❌ La musique n'est pas en pause.", ephemeral=True)
+
+
+@music.command(name="skip", description="Passe à la musique suivante")
+async def music_skip(interaction: discord.Interaction):
+    vc = interaction.guild.voice_client
+    if vc and (vc.is_playing() or vc.is_paused()):
+        vc.stop()
+        await interaction.response.send_message("⏭️ Musique passée.")
+    else:
+        await interaction.response.send_message("❌ Rien n'est en cours.", ephemeral=True)
+
+
+@music.command(name="stop", description="Arrête la musique et quitte le salon")
+async def music_stop(interaction: discord.Interaction):
+    gid = interaction.guild.id
+    player = music_players.get(gid)
+    if player:
+        player.queue.clear()
+        player.current = None
+    vc = interaction.guild.voice_client
+    if vc:
+        if vc.is_playing() or vc.is_paused():
+            vc.stop()
+        await vc.disconnect()
+    music_players.pop(gid, None)
+    await interaction.response.send_message("⏹️ Musique arrêtée.")
+
+
+@music.command(name="queue", description="Affiche la file d'attente")
+async def music_queue(interaction: discord.Interaction):
+    gid = interaction.guild.id
+    player = music_players.get(gid)
+    if not player or not player.queue:
+        return await interaction.response.send("📭 La file est vide.", ephemeral=True)
+
+    lines = []
+    for i, t in enumerate(player.queue[:10], 1):
+        lines.append(f"`{i}.` **{t['title']}** (`{format_duration(t['duration'])}`)")
+    if len(player.queue) > 10:
+        lines.append(f"\n... et **{len(player.queue) - 10}** autres")
+
+    await interaction.response.send("\n".join(lines))
+
+
+@music.command(name="nowplaying", description="Affiche la musique en cours")
+async def music_nowplaying(interaction: discord.Interaction):
+    gid = interaction.guild.id
+    player = music_players.get(gid)
+    if not player or not player.current:
+        return await interaction.response.send("❌ Rien n'est en cours.", ephemeral=True)
+
+    t = player.current
+    await interaction.response.send(
+        f"🎵 **{t['title']}**\n"
+        f"Durée : `{format_duration(t['duration'])}`\n"
+        f"File : `{len(player.queue)}` en attente"
+    )
+
+
+@music.command(name="volume", description="Change le volume (0-100)")
+@app_commands.describe(volume="Volume de 0 à 100")
+async def music_volume(interaction: discord.Interaction, volume: int):
+    if volume < 0 or volume > 100:
+        return await interaction.response.send("❌ Volume entre 0 et 100.", ephemeral=True)
+
+    gid = interaction.guild.id
+    player = music_players.get(gid)
+    if player:
+        player.volume = volume / 100
+    await interaction.response.send(f"🔊 Volume : **{volume}%**")
+
+
+@music.command(name="disconnect", description="Déconnecte le bot du salon vocal")
+async def music_disconnect(interaction: discord.Interaction):
+    gid = interaction.guild.id
+    player = music_players.get(gid)
+    if player:
+        player.queue.clear()
+    vc = interaction.guild.voice_client
+    if vc:
+        await vc.disconnect()
+    music_players.pop(gid, None)
+    await interaction.response.send_message("👋 Déconnecté.")
+
+
 
 
 # ──────────────────────────────────────────────
@@ -8008,7 +8146,7 @@ async def ai_panel(interaction: discord.Interaction):
 # Les handlers ci-dessous ont été fusionnés dans celui du ticket/help.
 
 # ─── ENREGISTREMENT DES GROUPES ───
-for g in [mod, config, welcome, ticket, util, fun, backup, stats, raid, ghostping, ai, giveaway, poll_cmd, level_cmd, log, botillion]:
+for g in [mod, config, welcome, ticket, music, util, fun, backup, stats, raid, ghostping, ai, giveaway, poll_cmd, level_cmd, log, botillion]:
     bot.tree.add_command(g)
 
 bot.run(TOKEN)
